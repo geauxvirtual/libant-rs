@@ -1,4 +1,5 @@
 use crate::defines;
+use log::{debug, info};
 use std::convert::TryInto;
 use std::fmt;
 
@@ -106,6 +107,7 @@ impl Iterator for ReadBuffer {
 pub enum Response {
     Startup(StartupMessage),
     ChannelResponse(ChannelResponseMessage),
+    BroadcastData(BroadcastDataMessage),
 }
 
 #[derive(Debug, PartialEq)]
@@ -137,6 +139,8 @@ pub enum StartupReason {
     Error,
 }
 
+// TODO: May need to increase the size of this if support for encryption for devices
+// is added, but not needed right now.
 #[derive(Debug, PartialEq)]
 pub struct ChannelResponseMessage([u8; 3]);
 
@@ -156,14 +160,34 @@ impl ChannelResponseMessage {
     pub fn code(&self) -> ChannelResponseCode {
         match self.0[2] {
             0x00 => ChannelResponseCode::ResponseNoError,
-            _ => unimplemented!(),
+            0x07 => ChannelResponseCode::EventChannelClosed,
+            0x15 => ChannelResponseCode::ChannelInWrongState,
+            _ => {
+                info!("Received ChannelResponseCode: {:x}", self.0[2]);
+                unimplemented!();
+            }
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BroadcastDataMessage([u8; 9]);
+
+impl BroadcastDataMessage {
+    pub fn new(mesg: &[u8]) -> Self {
+        Self(mesg.try_into().expect("Wrong number of elements passed"))
+    }
+
+    pub fn data(&self) -> [u8; 9] {
+        self.0
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ChannelResponseCode {
     ResponseNoError,
+    EventChannelClosed,
+    ChannelInWrongState,
 }
 
 #[derive(Clone, PartialEq)]
@@ -421,8 +445,11 @@ fn process_message(buf: &[u8]) -> Response {
         MESG_RESPONSE_EVENT_ID => {
             Response::ChannelResponse(ChannelResponseMessage::new(&buf[MESG_DATA_OFFSET..]))
         }
+        MESG_BROADCAST_DATA_ID => {
+            Response::BroadcastData(BroadcastDataMessage::new(&buf[MESG_DATA_OFFSET..]))
+        }
         _ => {
-            println!("Mesg: {:?}", buf);
+            println!("Mesg: {:x?}", buf);
             unimplemented!();
         }
     }
@@ -434,7 +461,7 @@ fn process_message(buf: &[u8]) -> Response {
 }
 
 pub fn reset() -> Message {
-    Message::new(MESG_RESET, &[0])
+    Message::new(MESG_RESET, &[0; 15])
 }
 
 pub fn set_network_key(network_number: u8, key: &[u8]) -> Message {
@@ -658,7 +685,7 @@ fn device_type(device_type: u8) -> &'static str {
     }
 }
 
-fn combine(f: &[u8]) -> u32 {
+pub fn combine(f: &[u8]) -> u32 {
     match f.len() {
         2 => (f[0] as u32) + ((f[1] as u32) << 8),
         3 => (f[0] as u32) + ((f[1] as u32) << 8) + ((f[2] as u32) << 16),
@@ -843,7 +870,7 @@ mod test {
     }
 
     #[test]
-    fn test_get_channel_id() {
+    fn get_channel_id_message() {
         let mesg = get_channel_id(0);
         // MESG_REQUEST = 0x4D
         // MESG_CHANNEL_ID_ID = 0x51
@@ -852,7 +879,7 @@ mod test {
     }
 
     #[test]
-    fn test_assign_channel_message() {
+    fn assign_channel_message() {
         let mesg = assign_channel(0, 0, 0);
         // MESG_ASSIGN_CHANNEL_ID = 0x42
         assert_eq!(mesg.id, 0x42);
@@ -860,7 +887,7 @@ mod test {
     }
 
     #[test]
-    fn test_set_channel_id_message() {
+    fn set_channel_id_message() {
         let mesg = set_channel_id(0, 1000, 0x78, 0);
         // MESG_CHANNEL_ID_ID = 0x51
         assert_eq!(mesg.id, 0x51);
@@ -872,7 +899,7 @@ mod test {
     }
 
     #[test]
-    fn test_set_hp_search_timeout_message() {
+    fn set_hp_search_timeout_message() {
         let mesg = set_hp_search_timeout(0, 30);
         // MESG_CHANNEL_SEARCH_TIMEOUT_ID = 0x44
         assert_eq!(mesg.id, 0x44);
@@ -880,7 +907,7 @@ mod test {
     }
 
     #[test]
-    fn test_set_channel_period_message() {
+    fn set_channel_period_message() {
         let mesg = set_channel_period(0, 8070);
         // MESG_CHANNEL_MESG_PERIOD_ID = 0x43
         assert_eq!(mesg.id, 0x43);
@@ -890,7 +917,7 @@ mod test {
     }
 
     #[test]
-    fn test_set_channel_frequency_message() {
+    fn set_channel_frequency_message() {
         let mesg = set_channel_frequency(0, 0x39);
         // MESG_CHANNEL_RADIO_FREQ_ID = 0x45
         assert_eq!(mesg.id, 0x45);
@@ -898,7 +925,7 @@ mod test {
     }
 
     #[test]
-    fn test_open_channel_message() {
+    fn open_channel_message() {
         let mesg = open_channel(0);
         // MESG_OPEN_CHANNEL_ID = 0x4B
         assert_eq!(mesg.id, 0x4B);
@@ -906,7 +933,7 @@ mod test {
     }
 
     #[test]
-    fn test_close_channel_message() {
+    fn close_channel_message() {
         let mesg = close_channel(0);
         // MESG_CLOSE_CHANNEL_ID = 0x4C
         assert_eq!(mesg.id, 0x4C);
@@ -914,7 +941,7 @@ mod test {
     }
 
     #[test]
-    fn test_unassign_channel_message() {
+    fn unassign_channel_message() {
         let mesg = unassign_channel(0);
         // MESG_UNASSIGN_CHANNEL_ID = 0x41
         assert_eq!(mesg.id, 0x41);
