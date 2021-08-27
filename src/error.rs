@@ -15,4 +15,6 @@ pub enum AntError {
     MessageTryRecvError(TryRecvError),
     #[error("ANT+ run loop already running")]
     AlreadyRunning,
+    #[error("Unable to reset ANT+ USB stick")]
+    Reset,
 }
