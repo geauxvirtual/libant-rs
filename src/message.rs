@@ -443,8 +443,8 @@ pub fn set_network_key(network_number: u8, key: &[u8]) -> Message {
     Message::new(MESG_NETWORK_KEY_ID, &data)
 }
 
-pub fn get_capabilities(channel: u8) -> Message {
-    Message::new(MESG_REQUEST, &[channel, MESG_CAPABILITIES_ID])
+pub fn get_capabilities() -> Message {
+    Message::new(MESG_REQUEST, &[0, MESG_CAPABILITIES_ID])
 }
 
 pub fn get_channel_id(channel: u8) -> Message {
@@ -835,7 +835,7 @@ mod test {
 
     #[test]
     fn test_get_capabilities_message() {
-        let mesg = get_capabilities(0);
+        let mesg = get_capabilities();
         // MESG_REQUEST = 0x4D
         // MESG_CAPABILITIES_ID = 0x54
         assert_eq!(mesg.id, 0x4D);
