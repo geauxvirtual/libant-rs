@@ -1,5 +1,5 @@
 use crate::defines;
-use log::{debug, info};
+use log::debug;
 use std::convert::TryInto;
 use std::fmt;
 
@@ -163,7 +163,7 @@ impl ChannelResponseMessage {
             0x07 => ChannelResponseCode::EventChannelClosed,
             0x15 => ChannelResponseCode::ChannelInWrongState,
             _ => {
-                info!("Received ChannelResponseCode: {:x}", self.0[2]);
+                debug!("Received ChannelResponseCode: {:x}", self.0[2]);
                 unimplemented!();
             }
         }

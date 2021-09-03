@@ -15,7 +15,7 @@ use log::{debug, error, trace};
 // Doing this for now, but ANT_NETWORK_KEY will most likely be passed in
 // when Ant::init is called. Whatever app is using this library may be
 // responsible for passing in the ANT_NETWORK_KEY.
-pub const ANT_NETWORK: u8 = 1;
+const ANT_NETWORK: u8 = 1;
 const ANT_NETWORK_KEY: [u8; 8] = [0xB9, 0xA5, 0x21, 0xFB, 0xBD, 0x72, 0xC3, 0x45];
 
 #[derive(Debug, PartialEq)]
@@ -161,7 +161,6 @@ impl<T: UsbContext> Ant<T> {
                     if mesg.code() == ChannelResponseCode::ResponseNoError {
                         debug! {"Setting state to Running"};
                         self.state = State::Running;
-                        let _ = self.get_capabilities();
                     }
                 }
                 _ => {}
