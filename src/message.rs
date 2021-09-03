@@ -160,7 +160,10 @@ impl ChannelResponseMessage {
     pub fn code(&self) -> ChannelResponseCode {
         match self.0[2] {
             0x00 => ChannelResponseCode::ResponseNoError,
+            0x01 => ChannelResponseCode::EventRxSearchTimeout,
+            0x02 => ChannelResponseCode::EventRxFail,
             0x07 => ChannelResponseCode::EventChannelClosed,
+            0x08 => ChannelResponseCode::EventRxFailGoToSearch,
             0x15 => ChannelResponseCode::ChannelInWrongState,
             _ => {
                 debug!("Received ChannelResponseCode: {:x}", self.0[2]);
@@ -186,7 +189,10 @@ impl BroadcastDataMessage {
 #[derive(Debug, PartialEq)]
 pub enum ChannelResponseCode {
     ResponseNoError,
+    EventRxSearchTimeout,
+    EventRxFail,
     EventChannelClosed,
+    EventRxFailGoToSearch,
     ChannelInWrongState,
 }
 

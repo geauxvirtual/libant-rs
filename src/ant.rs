@@ -10,7 +10,7 @@ use crate::{
     usb::{UsbContext, UsbDevice},
 };
 
-use log::{debug, error, trace};
+use log::{debug, error, info, trace};
 
 // Doing this for now, but ANT_NETWORK_KEY will most likely be passed in
 // when Ant::init is called. Whatever app is using this library may be
@@ -169,7 +169,39 @@ impl<T: UsbContext> Ant<T> {
                 Response::ChannelResponse(mesg) => {
                     // Check to see if we have an event
                     if mesg.message_id() == 1 {
-                        trace!("Event received: {:x?}", mesg);
+                        match mesg.code() {
+                            ChannelResponseCode::EventRxFail => {
+                                trace!("EVENT_RX_FAIL received on channel {}", mesg.channel());
+                            }
+                            ChannelResponseCode::EventRxSearchTimeout => {
+                                trace!(
+                                    "EVENT_RX_SEARCH_TIMEOUT received on channel {}",
+                                    mesg.channel()
+                                );
+                            }
+                            ChannelResponseCode::EventRxFailGoToSearch => {
+                                trace!(
+                                    "EVENT_RX_FAIL_GO_TO_SEARCH received on channel {}",
+                                    mesg.channel()
+                                );
+                            }
+                            ChannelResponseCode::EventChannelClosed => {
+                                // If a channel closed message is received, but the
+                                // the channel was not requested to be closed, re-open
+                                // the channel.
+                                trace!(
+                                    "EVENT_CHANNEL_CLOSED received on channel {}",
+                                    mesg.channel()
+                                );
+                                if let Some(c) = &mut self.channels[mesg.channel() as usize] {
+                                    info!("Re-opening channel {}", mesg.channel());
+                                    let _ = self.usb_device.write(&c.open().encode());
+                                }
+                            }
+                            _ => {
+                                trace!("Unhandled event received: {:x?}", mesg);
+                            }
+                        }
                         return;
                         //unimplemented!();
                     }
@@ -190,11 +222,15 @@ impl<T: UsbContext> Ant<T> {
                                 }
                             }
                         }
-                        ChannelResponseCode::EventChannelClosed => {
-                            debug!("Channel closed");
-                        }
                         ChannelResponseCode::ChannelInWrongState => {
-                            debug!("Channel in wrong state");
+                            trace!(
+                                "CHANNEL_IN_WRONG_STATE received on channel {}",
+                                mesg.channel()
+                            );
+                        }
+                        _ => {
+                            trace!("Unhandled channel response received: {:x?}", mesg);
+                            return;
                         }
                     }
                 }
