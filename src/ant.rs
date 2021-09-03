@@ -50,7 +50,7 @@ pub struct Ant<T: UsbContext> {
     state: State,
     request: Receiver<Request>,
     message: Sender<Response>,
-    channels: Vec<Channel>,
+    channels: [Option<Channel>; 8],
     //    messages: Channel,
 }
 
@@ -60,7 +60,7 @@ impl<T: UsbContext> Ant<T> {
             usb_device: UsbDevice::init(ctx)?,
             state: State::NotReady,
             request: rx,
-            channels: vec![],
+            channels: Default::default(),
             message: tx,
             //            messages: Channel::new(),
         })
@@ -114,16 +114,15 @@ impl<T: UsbContext> Ant<T> {
                             let channel = Channel::new(number, device);
                             // handle error
                             let _ = self.usb_device.write(&channel.assign(ANT_NETWORK).encode());
-                            self.channels.push(channel);
+                            self.channels[number as usize] = Some(channel);
                         }
                         Request::CloseChannel(number) => {
-                            for c in self.channels.iter() {
-                                if number == c.number() {
-                                    debug!("Closing channel {}", number);
-                                    let _ = self
-                                        .usb_device
-                                        .write(&message::close_channel(number).encode());
-                                }
+                            if self.channels[number as usize].is_some() {
+                                debug!("Closing channel {}", number);
+                                let _ = self
+                                    .usb_device
+                                    .write(&message::close_channel(number).encode());
+                                self.channels[number as usize] = None
                             }
                         }
                         Request::Send(mesg) => {
@@ -179,17 +178,15 @@ impl<T: UsbContext> Ant<T> {
                     // panic until we add support for it. Happy path for now.
                     match mesg.code() {
                         ChannelResponseCode::ResponseNoError => {
-                            for c in &mut self.channels {
-                                if c.number() == mesg.channel() {
-                                    // Should use this to update state and then
-                                    // then configure the next message. We
-                                    // don't have a copy of the TX side of our
-                                    // request channel here. May have to rethink
-                                    // how that gets created and handled, or figure out
-                                    // a better way to send the next message.
-                                    if let Some(mesg) = c.route(&mesg) {
-                                        let _ = self.usb_device.write(&mesg.encode());
-                                    }
+                            if let Some(c) = &mut self.channels[mesg.channel() as usize] {
+                                // Should use this to update state and then
+                                // then configure the next message. We
+                                // don't have a copy of the TX side of our
+                                // request channel here. May have to rethink
+                                // how that gets created and handled, or figure out
+                                // a better way to send the next message.
+                                if let Some(mesg) = c.route(&mesg) {
+                                    let _ = self.usb_device.write(&mesg.encode());
                                 }
                             }
                         }
