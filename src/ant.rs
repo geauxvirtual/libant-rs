@@ -62,12 +62,6 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
                 error!("Error communicating on transmit channel: {:?}", e);
             }
             return;
-            //        match tx.send(Response::Error(AntError::UsbDeviceError(e))) {
-            //            Ok(_) => return,
-            //            Err(e) => {
-            //               error!("Error communicating  on transmit channel: {:?}", e);
-            //                return;
-            //            }
         }
     };
 
@@ -82,18 +76,19 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
                     error!("Error communicating on transmit channel: {:?}", e);
                     return;
                 }
-                //match tx.send(Response::Error(e)) {
-                //    Ok(_) => {}
-                //    Err(e) => {
-                //        error!("Error communicating on transmit channel: {:?}", e);
-                //        return;
-                //    }
-                //}
                 std::thread::sleep(std::time::Duration::from_millis(1000));
             }
         }
     };
-    Ant::init(usb_device, rx, tx).run().unwrap()
+
+    // Initialize and run our ANT+ message loop, returning any errors
+    // received back through transmit channel.
+    if let Err(e) = Ant::init(usb_device, rx, tx.clone()).run() {
+        if let Err(e) = tx.send(Response::Error(e)) {
+            error!("Error communicating on transmit channel: {:?}", e);
+            return;
+        }
+    }
 }
 
 pub struct Ant<T: UsbContext> {
