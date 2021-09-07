@@ -61,7 +61,7 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
             match tx.send(Response::Error(AntError::UsbDeviceError(e))) {
                 Ok(_) => return,
                 Err(e) => {
-                    error!("Error sending error on transmit channel: {:?}", e);
+                    error!("Error communicating  on transmit channel: {:?}", e);
                     return;
                 }
             }
