@@ -58,13 +58,16 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
         Ok(ctx) => ctx,
         Err(e) => {
             error!("Error getting USB Context: {:?}", e);
-            match tx.send(Response::Error(AntError::UsbDeviceError(e))) {
-                Ok(_) => return,
-                Err(e) => {
-                    error!("Error communicating  on transmit channel: {:?}", e);
-                    return;
-                }
+            if let Err(e) = tx.send(Response::Error(AntError::UsbDeviceError(e))) {
+                error!("Error communicating on transmit channel: {:?}", e);
             }
+            return;
+            //        match tx.send(Response::Error(AntError::UsbDeviceError(e))) {
+            //            Ok(_) => return,
+            //            Err(e) => {
+            //               error!("Error communicating  on transmit channel: {:?}", e);
+            //                return;
+            //            }
         }
     };
 
@@ -75,13 +78,17 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
             Ok(device) => break device,
             Err(e) => {
                 error!("Error initializing ANT+ USB stick: {:?}", e);
-                match tx.send(Response::Error(e)) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!("Error communicating on transmit channel: {:?}", e);
-                        return;
-                    }
+                if let Err(e) = tx.send(Response::Error(e)) {
+                    error!("Error communicating on transmit channel: {:?}", e);
+                    return;
                 }
+                //match tx.send(Response::Error(e)) {
+                //    Ok(_) => {}
+                //    Err(e) => {
+                //        error!("Error communicating on transmit channel: {:?}", e);
+                //        return;
+                //    }
+                //}
                 std::thread::sleep(std::time::Duration::from_millis(1000));
             }
         }
