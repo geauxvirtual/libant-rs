@@ -6,7 +6,8 @@ use crate::{
     channel::Channel,
     device::Device,
     error::AntError,
-    message::{self, ChannelResponseCode, Message, Response},
+    message::Response as DeviceResponse,
+    message::{self, BroadcastDataMessage, ChannelResponseCode, Message},
     usb::{UsbContext, UsbDevice},
 };
 
@@ -26,23 +27,66 @@ enum State {
     Running,
 }
 
-//struct Channel {
-//    rx: Receiver<Message>,
-//    tx: Sender<Message>,
-//}
-
-//impl Channel {
-//    fn new() -> Self {
-//        let (tx, rx) = unbounded();
-//        Channel { rx, tx }
-//    }
-//}
-
+// TODO: Rename this to Command
 pub enum Request {
     OpenChannel(u8, Device),
     CloseChannel(u8),
     Send(Message),
     Quit,
+}
+
+#[derive(Debug)]
+pub enum Response {
+    BroadcastData(BroadcastDataMessage),
+    Error(AntError),
+}
+
+// run is a public function that handles getting a USB context and
+// initializing the ANT+ stick. Errors are returned through the transmit side
+// of the ant message channel passed in. In the case of the USB context, if
+// an error is received, an error will be sent back on the channel and then
+// the function will return. If an error is received trying to initialize
+// the ANT+ stick, the error will be returned on the transmit channel and the
+// fucnction will continue to loop as some errors could involve the ANT+ stick
+// not being plugged in. When the ANT+ stick can be initialized, the function
+// will call ANT::init().run() that will reset and startup the ANT+ stick
+// and get it ready for communication.
+pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
+    // Get the USB context. If there is an error, send an Error
+    // response over the transmit channel and return.
+    let mut ctx = match crate::Context::new() {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            error!("Error getting USB Context: {:?}", e);
+            match tx.send(Response::Error(AntError::UsbDeviceError(e))) {
+                Ok(_) => return,
+                Err(e) => {
+                    error!("Error sending error on transmit channel: {:?}", e);
+                    return;
+                }
+            }
+        }
+    };
+
+    // Loop here looking for the ANT+ stick. If the user has not plugged
+    // in the ANT+ stick, check every 1 second.
+    let usb_device = loop {
+        match UsbDevice::init(&mut ctx) {
+            Ok(device) => break device,
+            Err(e) => {
+                error!("Error initializing ANT+ USB stick: {:?}", e);
+                match tx.send(Response::Error(e)) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Error communicating on transmit channel: {:?}", e);
+                        return;
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+            }
+        }
+    };
+    Ant::init(usb_device, rx, tx).run().unwrap()
 }
 
 pub struct Ant<T: UsbContext> {
@@ -51,19 +95,17 @@ pub struct Ant<T: UsbContext> {
     request: Receiver<Request>,
     message: Sender<Response>,
     channels: [Option<Channel>; 8],
-    //    messages: Channel,
 }
 
 impl<T: UsbContext> Ant<T> {
-    pub fn init(ctx: &mut T, rx: Receiver<Request>, tx: Sender<Response>) -> Result<Ant<T>> {
-        Ok(Ant {
-            usb_device: UsbDevice::init(ctx)?,
+    pub fn init(usb_device: UsbDevice<T>, rx: Receiver<Request>, tx: Sender<Response>) -> Ant<T> {
+        Ant {
+            usb_device: usb_device,
             state: State::NotReady,
             request: rx,
-            channels: Default::default(),
             message: tx,
-            //            messages: Channel::new(),
-        })
+            channels: Default::default(),
+        }
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -88,6 +130,15 @@ impl<T: UsbContext> Ant<T> {
                         self.state = State::Reset;
                     }
                     State::Reset => {
+                        // From time to time, ANT+ sticks may not respond
+                        // to reset requests, especially if open channels
+                        // were not closed or unassigned prior to the
+                        // thread exiting. If the ANT+ stick gets stuck
+                        // in this state,no messages will be received and acted
+                        // on, and reset messages will just continue to be sent.
+                        // This is configured to try three times then exit, but
+                        // it may be better to also send an error through the message
+                        // channel prior to returning the error.
                         if reset_attempts < 2 {
                             debug! {"Sending reset command"};
                             self.reset()?;
@@ -98,6 +149,10 @@ impl<T: UsbContext> Ant<T> {
                     }
                     _ => {}
                 },
+                // TODO: Catch NoDeviceError and continue checking for device.
+                // Set state back to NotReady if state is different. Add ability
+                // to resetup channels if channels had been configured
+                // prior to ANT+ stick being removed and reinserted.
                 Err(e) => return Err(e),
             }
             // Messages handled, let's see if there are any requests to
@@ -138,11 +193,11 @@ impl<T: UsbContext> Ant<T> {
         Ok(())
     }
 
-    fn route(&mut self, message: &Response) {
+    fn route(&mut self, message: &DeviceResponse) {
         match self.state {
             State::NotReady => {} // Drop message
             State::Reset => match message {
-                Response::Startup(_mesg) => {
+                DeviceResponse::Startup(_mesg) => {
                     debug! {"Setting state to SetNetworkKey"};
                     self.state = State::SetNetworkKey;
                     debug! {"Setting network key"};
@@ -155,8 +210,8 @@ impl<T: UsbContext> Ant<T> {
                 _ => debug!("{:x?}", message), // Drop message
             },
             State::SetNetworkKey => match message {
-                Response::Startup(_mesg) => self.state = State::Reset,
-                Response::ChannelResponse(mesg) => {
+                DeviceResponse::Startup(_mesg) => self.state = State::Reset,
+                DeviceResponse::ChannelResponse(mesg) => {
                     if mesg.code() == ChannelResponseCode::ResponseNoError {
                         debug! {"Setting state to Running"};
                         self.state = State::Running;
@@ -165,8 +220,8 @@ impl<T: UsbContext> Ant<T> {
                 _ => {}
             },
             State::Running => match message {
-                Response::Startup(_mesg) => self.state = State::Reset,
-                Response::ChannelResponse(mesg) => {
+                DeviceResponse::Startup(_mesg) => self.state = State::Reset,
+                DeviceResponse::ChannelResponse(mesg) => {
                     // Check to see if we have an event
                     if mesg.message_id() == 1 {
                         match mesg.code() {
@@ -234,7 +289,7 @@ impl<T: UsbContext> Ant<T> {
                         }
                     }
                 }
-                Response::BroadcastData(mesg) => self
+                DeviceResponse::BroadcastData(mesg) => self
                     .message
                     .send(Response::BroadcastData(mesg.clone()))
                     .unwrap(),
