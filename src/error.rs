@@ -17,4 +17,6 @@ pub enum AntError {
     AlreadyRunning,
     #[error("Unable to reset ANT+ USB stick")]
     Reset,
+    #[error("Channel {0} already exists")]
+    ChannelExists(u8),
 }
