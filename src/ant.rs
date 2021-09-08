@@ -4,7 +4,7 @@ use crossbeam_channel::{Receiver, Sender};
 use super::Result;
 use crate::{
     channel::Channel,
-    device::Device,
+    //    device::Device,
     error::AntError,
     message::Response as DeviceResponse,
     message::{self, BroadcastDataMessage, ChannelResponseCode, Message},
@@ -29,7 +29,7 @@ enum State {
 
 // TODO: Rename this to Command
 pub enum Request {
-    OpenChannel(u8, Device),
+    OpenChannel(Channel),
     CloseChannel(u8),
     Send(Message),
     Quit,
@@ -58,9 +58,16 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
         Ok(ctx) => ctx,
         Err(e) => {
             error!("Error getting USB Context: {:?}", e);
-            if let Err(e) = tx.send(Response::Error(AntError::UsbDeviceError(e))) {
-                error!("Error communicating on transmit channel: {:?}", e);
-            }
+            // unwrap() is called here as the only error we should receive
+            // here is if the other end of the channel has disconnected, i.e.
+            // the other thread either no longer exists, or the channel has been
+            // dropped. Without a transmit channel, nothing can actually be done
+            // so might as well panic to kill this thread.
+            tx.send(Response::Error(AntError::UsbDeviceError(e)))
+                .unwrap();
+            //if let Err(e) = tx.send(Response::Error(AntError::UsbDeviceError(e))) {
+            //    error!("Error communicating on transmit channel: {:?}", e);
+            //}
             return;
         }
     };
@@ -72,10 +79,11 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
             Ok(device) => break device,
             Err(e) => {
                 error!("Error initializing ANT+ USB stick: {:?}", e);
-                if let Err(e) = tx.send(Response::Error(e)) {
-                    error!("Error communicating on transmit channel: {:?}", e);
-                    return;
-                }
+                tx.send(Response::Error(e)).unwrap();
+                //if let Err(e) = tx.send(Response::Error(e)) {
+                //    error!("Error communicating on transmit channel: {:?}", e);
+                //    return;
+                //}
                 std::thread::sleep(std::time::Duration::from_millis(1000));
             }
         }
@@ -84,10 +92,11 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
     // Initialize and run our ANT+ message loop, returning any errors
     // received back through transmit channel.
     if let Err(e) = Ant::init(usb_device, rx, tx.clone()).run() {
-        if let Err(e) = tx.send(Response::Error(e)) {
-            error!("Error communicating on transmit channel: {:?}", e);
-            return;
-        }
+        tx.send(Response::Error(e)).unwrap();
+        //if let Err(e) = tx.send(Response::Error(e)) {
+        //    error!("Error communicating on transmit channel: {:?}", e);
+        //    return;
+        //}
     }
 }
 
@@ -138,9 +147,7 @@ impl<T: UsbContext> Ant<T> {
                         // thread exiting. If the ANT+ stick gets stuck
                         // in this state,no messages will be received and acted
                         // on, and reset messages will just continue to be sent.
-                        // This is configured to try three times then exit, but
-                        // it may be better to also send an error through the message
-                        // channel prior to returning the error.
+                        // This is configured to try three times then exitt
                         if reset_attempts < 2 {
                             debug! {"Sending reset command"};
                             self.reset()?;
@@ -162,13 +169,27 @@ impl<T: UsbContext> Ant<T> {
             if let State::Running = self.state {
                 match self.request.try_recv() {
                     Ok(request) => match request {
-                        Request::OpenChannel(number, device) => {
+                        Request::OpenChannel(channel) => {
                             // TODO: Loop through existing channels to see if channel
                             // is already assigned. If it is, return an error
                             // back on message channel. If it doesn't exist,
                             // push channel into channels vec, and then send a
                             // message to assign the channel.
-                            let channel = Channel::new(number, device);
+                            let number = channel.number();
+                            if self.channels[number as usize].is_some() {
+                                error!("Channel {} already exists", number);
+                                self.message
+                                    .send(Response::Error(AntError::ChannelExists(number)))
+                                    .unwrap();
+                                continue;
+                                //if let Err(e) = self
+                                //    .message
+                                //    .send(Response::Error(AntError::ChannelExists(number)))
+                                //{
+                                //    error!("Error communicating on transmit channel: {:?}", e);
+                                //    return Ok(());
+                                //}
+                            }
                             // handle error
                             let _ = self.usb_device.write(&channel.assign(ANT_NETWORK).encode());
                             self.channels[number as usize] = Some(channel);
