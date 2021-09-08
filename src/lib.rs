@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 pub mod ant;
-mod channel;
+pub mod channel;
 mod defines;
 pub mod device;
 mod error;
