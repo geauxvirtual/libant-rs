@@ -65,9 +65,6 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
             // so might as well panic to kill this thread.
             tx.send(Response::Error(AntError::UsbDeviceError(e)))
                 .unwrap();
-            //if let Err(e) = tx.send(Response::Error(AntError::UsbDeviceError(e))) {
-            //    error!("Error communicating on transmit channel: {:?}", e);
-            //}
             return;
         }
     };
@@ -80,10 +77,6 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
             Err(e) => {
                 error!("Error initializing ANT+ USB stick: {:?}", e);
                 tx.send(Response::Error(e)).unwrap();
-                //if let Err(e) = tx.send(Response::Error(e)) {
-                //    error!("Error communicating on transmit channel: {:?}", e);
-                //    return;
-                //}
                 std::thread::sleep(std::time::Duration::from_millis(1000));
             }
         }
@@ -93,10 +86,6 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
     // received back through transmit channel.
     if let Err(e) = Ant::init(usb_device, rx, tx.clone()).run() {
         tx.send(Response::Error(e)).unwrap();
-        //if let Err(e) = tx.send(Response::Error(e)) {
-        //    error!("Error communicating on transmit channel: {:?}", e);
-        //    return;
-        //}
     }
 }
 
@@ -190,21 +179,30 @@ impl<T: UsbContext> Ant<T> {
                                 //    return Ok(());
                                 //}
                             }
-                            // handle error
-                            let _ = self.usb_device.write(&channel.assign(ANT_NETWORK).encode());
+                            //let _ = self.usb_device.write(&channel.assign(ANT_NETWORK).encode());
+                            // TODO: Handle error properly. For now, we'll just unwrap
+                            // so the thread panics if there are any issues
+                            // writing out to the ANT+ stick
+                            self.usb_device
+                                .write(&channel.assign(ANT_NETWORK).encode())
+                                .unwrap();
                             self.channels[number as usize] = Some(channel);
                         }
                         Request::CloseChannel(number) => {
                             if self.channels[number as usize].is_some() {
                                 debug!("Closing channel {}", number);
-                                let _ = self
-                                    .usb_device
-                                    .write(&message::close_channel(number).encode());
+                                //let _ = self
+                                //    .usb_device
+                                //    .write(&message::close_channel(number).encode());
+                                self.usb_device
+                                    .write(&message::close_channel(number).encode())
+                                    .unwrap();
                                 self.channels[number as usize] = None
                             }
                         }
                         Request::Send(mesg) => {
-                            let _ = self.usb_device.write(&mesg.encode());
+                            //let _ = self.usb_device.write(&mesg.encode());
+                            self.usb_device.write(&mesg.encode()).unwrap();
                         }
                         Request::Quit => return Ok(()),
                     },
@@ -337,18 +335,4 @@ impl<T: UsbContext> Ant<T> {
             .write(&message::get_capabilities().encode())?;
         Ok(())
     }
-
-    //    pub fn send(&self, m: Message) -> Result<()> {
-    //        self.requests
-    //            .tx
-    //            .send(m)
-    //            .map_err(|e| AntError::RequestSendError(e))
-    //    }
-    //
-    //    pub fn try_recv(&self) -> Result<Message> {
-    //        self.messages
-    //            .rx
-    //            .try_recv()
-    //            .map_err(|e| AntError::MessageTryRecvError(e))
-    //    }
 }
