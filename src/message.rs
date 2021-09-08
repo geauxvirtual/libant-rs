@@ -173,6 +173,7 @@ impl ChannelResponseMessage {
     }
 }
 
+// TODO: See if this impacts extended messages. Most likely does.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BroadcastDataMessage([u8; 9]);
 
@@ -181,8 +182,12 @@ impl BroadcastDataMessage {
         Self(mesg.try_into().expect("Wrong number of elements passed"))
     }
 
-    pub fn data(&self) -> [u8; 9] {
-        self.0
+    pub fn channel(&self) -> u8 {
+        self.0[0]
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.0[1..]
     }
 }
 
