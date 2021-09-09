@@ -145,7 +145,7 @@ pub enum StartupReason {
 pub struct ChannelResponseMessage([u8; 3]);
 
 impl ChannelResponseMessage {
-    pub fn new(mesg: &[u8]) -> Self {
+    pub fn from(mesg: &[u8]) -> Self {
         Self(mesg.try_into().expect("Wrong number of elements passed"))
     }
 
@@ -178,7 +178,7 @@ impl ChannelResponseMessage {
 pub struct BroadcastDataMessage([u8; 9]);
 
 impl BroadcastDataMessage {
-    pub fn new(mesg: &[u8]) -> Self {
+    pub fn from(mesg: &[u8]) -> Self {
         Self(mesg.try_into().expect("Wrong number of elements passed"))
     }
 
@@ -454,10 +454,10 @@ fn process_message(buf: &[u8]) -> Response {
     match buf[MESG_ID_OFFSET] {
         MESG_STARTUP_MESG_ID => Response::Startup(StartupMessage(buf[MESG_DATA_OFFSET])),
         MESG_RESPONSE_EVENT_ID => {
-            Response::ChannelResponse(ChannelResponseMessage::new(&buf[MESG_DATA_OFFSET..]))
+            Response::ChannelResponse(ChannelResponseMessage::from(&buf[MESG_DATA_OFFSET..]))
         }
         MESG_BROADCAST_DATA_ID => {
-            Response::BroadcastData(BroadcastDataMessage::new(&buf[MESG_DATA_OFFSET..]))
+            Response::BroadcastData(BroadcastDataMessage::from(&buf[MESG_DATA_OFFSET..]))
         }
         _ => {
             println!("Mesg: {:x?}", buf);
