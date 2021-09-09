@@ -3,6 +3,7 @@ use crossbeam_channel::{Receiver, Sender};
 use super::Result;
 use crate::{
     channel::Channel,
+    device::Device,
     error::AntError,
     message::Response as DeviceResponse,
     message::{self, BroadcastDataMessage, ChannelResponseCode, Message},
@@ -27,7 +28,7 @@ enum State {
 
 // TODO: Rename this to Command
 pub enum Request {
-    OpenChannel(Channel),
+    OpenChannel(u8, Device),
     CloseChannel(u8),
     Send(Message),
     Quit,
@@ -156,13 +157,12 @@ impl<T: UsbContext> Ant<T> {
             if let State::Running = self.state {
                 match self.request.try_recv() {
                     Ok(request) => match request {
-                        Request::OpenChannel(channel) => {
+                        Request::OpenChannel(number, device) => {
                             // TODO: Loop through existing channels to see if channel
                             // is already assigned. If it is, return an error
                             // back on message channel. If it doesn't exist,
                             // push channel into channels vec, and then send a
                             // message to assign the channel.
-                            let number = channel.number();
                             if self.channels[number as usize].is_some() {
                                 error!("Channel {} already exists", number);
                                 self.message
@@ -181,6 +181,7 @@ impl<T: UsbContext> Ant<T> {
                             // TODO: Handle error properly. For now, we'll just unwrap
                             // so the thread panics if there are any issues
                             // writing out to the ANT+ stick
+                            let channel = Channel::new(number, device);
                             self.usb_device
                                 .write(&channel.assign(ANT_NETWORK).encode())
                                 .unwrap();
