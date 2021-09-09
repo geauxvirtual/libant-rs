@@ -1,10 +1,8 @@
-//use crossbeam_channel::{unbounded, Receiver, Sender};
 use crossbeam_channel::{Receiver, Sender};
 
 use super::Result;
 use crate::{
     channel::Channel,
-    //    device::Device,
     error::AntError,
     message::Response as DeviceResponse,
     message::{self, BroadcastDataMessage, ChannelResponseCode, Message},
