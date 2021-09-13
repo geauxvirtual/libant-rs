@@ -169,13 +169,6 @@ impl<T: UsbContext> Ant<T> {
                                     .send(Response::Error(AntError::ChannelExists(number)))
                                     .unwrap();
                                 continue;
-                                //if let Err(e) = self
-                                //    .message
-                                //    .send(Response::Error(AntError::ChannelExists(number)))
-                                //{
-                                //    error!("Error communicating on transmit channel: {:?}", e);
-                                //    return Ok(());
-                                //}
                             }
                             //let _ = self.usb_device.write(&channel.assign(ANT_NETWORK).encode());
                             // TODO: Handle error properly. For now, we'll just unwrap
@@ -190,9 +183,6 @@ impl<T: UsbContext> Ant<T> {
                         Request::CloseChannel(number) => {
                             if self.channels[number as usize].is_some() {
                                 debug!("Closing channel {}", number);
-                                //let _ = self
-                                //    .usb_device
-                                //    .write(&message::close_channel(number).encode());
                                 self.usb_device
                                     .write(&message::close_channel(number).encode())
                                     .unwrap();
