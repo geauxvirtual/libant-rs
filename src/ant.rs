@@ -170,7 +170,6 @@ impl<T: UsbContext> Ant<T> {
                                     .unwrap();
                                 continue;
                             }
-                            //let _ = self.usb_device.write(&channel.assign(ANT_NETWORK).encode());
                             // TODO: Handle error properly. For now, we'll just unwrap
                             // so the thread panics if there are any issues
                             // writing out to the ANT+ stick
@@ -193,7 +192,11 @@ impl<T: UsbContext> Ant<T> {
                             //let _ = self.usb_device.write(&mesg.encode());
                             self.usb_device.write(&mesg.encode()).unwrap();
                         }
-                        Request::Quit => return Ok(()),
+                        Request::Quit => {
+                            self.reset()?;
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                            return Ok(());
+                        }
                     },
                     Err(crossbeam_channel::TryRecvError::Disconnected) => break,
                     Err(_) => continue,
@@ -258,10 +261,21 @@ impl<T: UsbContext> Ant<T> {
                                     "EVENT_CHANNEL_CLOSED received on channel {}",
                                     mesg.channel()
                                 );
-                                if let Some(c) = &mut self.channels[mesg.channel() as usize] {
-                                    info!("Re-opening channel {}", mesg.channel());
-                                    let _ = self.usb_device.write(&c.open().encode());
-                                }
+                                let send_mesg = match &mut self.channels[mesg.channel() as usize] {
+                                    Some(c) => {
+                                        // If a channel closed message is received, but the
+                                        // the channel was not requested to be closed, re-open
+                                        // the channel.
+                                        info!("Re-opening channel {}", mesg.channel());
+                                        c.open().encode()
+                                    }
+                                    None => {
+                                        // Unassign channel that was closed
+                                        debug!("Unassigning channel {}", mesg.channel());
+                                        crate::message::unassign_channel(mesg.channel()).encode()
+                                    }
+                                };
+                                self.usb_device.write(&send_mesg).unwrap();
                             }
                             _ => {
                                 trace!("Unhandled event received: {:x?}", mesg);
