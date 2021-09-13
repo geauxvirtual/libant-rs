@@ -3,7 +3,9 @@
 // flip every four pages to signify legacy or newer device.
 // TODO: Support get capabilities and changing mode of HR device if device
 // supports wimming or running data.
-use crate::message::{combine, AcknowledgeDataMessage, MESG_ACKNOWLEDGE_DATA_ID};
+use crate::message::{combine, AcknowledgeDataMessage};
+
+const COMMON_DATA_PAGE_70: u8 = 0x46;
 
 // TODO Split out channel config from device broadcast data
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -197,7 +199,7 @@ impl HeartRateMonitor {
     // requesting a specific page to be sent back to the device.
     fn request_data_page(&self, page_number: u8) -> [u8; 8] {
         [
-            MESG_ACKNOWLEDGE_DATA_ID,
+            COMMON_DATA_PAGE_70,
             0xFF,
             0xFF,
             0xFF,
