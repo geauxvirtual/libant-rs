@@ -44,6 +44,7 @@ pub const MESG_OPEN_CHANNEL_ID: u8 = 0x4B;
 pub const MESG_CLOSE_CHANNEL_ID: u8 = 0x4C;
 pub const MESG_REQUEST: u8 = 0x4D;
 pub const MESG_BROADCAST_DATA_ID: u8 = 0x4E;
+pub const MESG_ACKNOWLEDGE_DATA_ID: u8 = 0x4F;
 pub const MESG_CHANNEL_ID_ID: u8 = 0x51;
 pub const MESG_CAPABILITIES_ID: u8 = 0x54;
 pub const MESG_STARTUP_MESG_ID: u8 = 0x6F;
@@ -139,6 +140,18 @@ pub enum StartupReason {
     Error,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ChannelResponseCode {
+    ResponseNoError,
+    EventRxSearchTimeout,
+    EventRxFail,
+    EventTx,
+    EventTransferTxCompleted,
+    EventTransferTxFailed,
+    EventChannelClosed,
+    EventRxFailGoToSearch,
+    ChannelInWrongState,
+}
 // TODO: May need to increase the size of this if support for encryption for devices
 // is added, but not needed right now.
 #[derive(Debug, PartialEq)]
@@ -162,6 +175,9 @@ impl ChannelResponseMessage {
             0x00 => ChannelResponseCode::ResponseNoError,
             0x01 => ChannelResponseCode::EventRxSearchTimeout,
             0x02 => ChannelResponseCode::EventRxFail,
+            0x03 => ChannelResponseCode::EventTx,
+            0x05 => ChannelResponseCode::EventTransferTxCompleted,
+            0x06 => ChannelResponseCode::EventTransferTxFailed,
             0x07 => ChannelResponseCode::EventChannelClosed,
             0x08 => ChannelResponseCode::EventRxFailGoToSearch,
             0x15 => ChannelResponseCode::ChannelInWrongState,
@@ -178,6 +194,15 @@ impl ChannelResponseMessage {
 pub struct BroadcastDataMessage([u8; 9]);
 
 impl BroadcastDataMessage {
+    // TODO: Should this return an error if user tries to pass in
+    // data longer than 8?
+    pub fn new(channel_number: u8, data: &[u8]) -> Self {
+        let mut buf: [u8; 9] = [0; 9];
+        buf[0] = channel_number;
+        buf[1..].copy_from_slice(data);
+        Self(buf)
+    }
+
     pub fn from(mesg: &[u8]) -> Self {
         Self(mesg.try_into().expect("Wrong number of elements passed"))
     }
@@ -189,16 +214,40 @@ impl BroadcastDataMessage {
     pub fn data(&self) -> &[u8] {
         &self.0[1..]
     }
+
+    pub fn to_message(&self) -> Message {
+        Message::new(MESG_BROADCAST_DATA_ID, &self.0)
+    }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum ChannelResponseCode {
-    ResponseNoError,
-    EventRxSearchTimeout,
-    EventRxFail,
-    EventChannelClosed,
-    EventRxFailGoToSearch,
-    ChannelInWrongState,
+#[derive(Clone, Debug, PartialEq)]
+pub struct AcknowledgeDataMessage([u8; 9]);
+
+impl AcknowledgeDataMessage {
+    // TODO: Should this return an error if user tries to pass in
+    // data longer than 8?
+    pub fn new(channel_number: u8, data: &[u8]) -> Self {
+        let mut buf: [u8; 9] = [0; 9];
+        buf[0] = channel_number;
+        buf[1..].copy_from_slice(data);
+        Self(buf)
+    }
+
+    pub fn from(mesg: &[u8]) -> Self {
+        Self(mesg.try_into().expect("Wrong number of elements passed"))
+    }
+
+    pub fn channel(&self) -> u8 {
+        self.0[0]
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.0[1..]
+    }
+
+    pub fn to_message(&self) -> Message {
+        Message::new(MESG_ACKNOWLEDGE_DATA_ID, &self.0)
+    }
 }
 
 #[derive(Clone, PartialEq)]

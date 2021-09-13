@@ -3,8 +3,9 @@
 // flip every four pages to signify legacy or newer device.
 // TODO: Support get capabilities and changing mode of HR device if device
 // supports wimming or running data.
-use crate::message::combine;
+use crate::message::{combine, AcknowledgeDataMessage, MESG_ACKNOWLEDGE_DATA_ID};
 
+// TODO Split out channel config from device broadcast data
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HeartRateMonitor {
     channel_type: u8,
@@ -140,6 +141,7 @@ impl HeartRateMonitor {
         return "Unknown";
     }
 
+    // Decode broadcast data received from ANT+ device.
     pub fn decode_broadcast_data(&mut self, data: &[u8]) {
         // Check length of slice. Discard for now if not 9.
         if data.len() == 8 {
@@ -177,6 +179,33 @@ impl HeartRateMonitor {
             self.heartbeat_count = data[6];
             self.heartrate = data[7];
         }
+    }
+
+    // Sends an Acknowledge data page to the heart rate monitor requesting
+    // the manufactuer information.
+    pub fn request_manufactuer_info(&self, channel_number: u8) -> AcknowledgeDataMessage {
+        AcknowledgeDataMessage::new(channel_number, &self.request_data_page(0x02))
+    }
+
+    // Send an Acknowledge data page to the heart rate monitor requesting
+    // the battery status for the heart rate monitor.
+    pub fn request_battery_status(&self, channel_number: u8) -> AcknowledgeDataMessage {
+        AcknowledgeDataMessage::new(channel_number, &self.request_data_page(0x07))
+    }
+
+    // The general cknowledge data page to send to the heart rate monitor
+    // requesting a specific page to be sent back to the device.
+    fn request_data_page(&self, page_number: u8) -> [u8; 8] {
+        [
+            MESG_ACKNOWLEDGE_DATA_ID,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF,
+            0x01,
+            page_number,
+            0x01,
+        ]
     }
 }
 
