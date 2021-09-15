@@ -55,6 +55,10 @@ impl HeartRateMonitor {
         self
     }
 
+    pub fn build(&self) -> Self {
+        self.clone()
+    }
+
     pub fn device_id(&self) -> u16 {
         self.device_id
     }
