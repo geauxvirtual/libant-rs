@@ -150,6 +150,7 @@ pub enum ChannelResponseCode {
     EventTransferTxFailed,
     EventChannelClosed,
     EventRxFailGoToSearch,
+    ChannelCollision,
     ChannelInWrongState,
 }
 // TODO: May need to increase the size of this if support for encryption for devices
@@ -180,6 +181,7 @@ impl ChannelResponseMessage {
             0x06 => ChannelResponseCode::EventTransferTxFailed,
             0x07 => ChannelResponseCode::EventChannelClosed,
             0x08 => ChannelResponseCode::EventRxFailGoToSearch,
+            0x09 => ChannelResponseCode::ChannelCollision,
             0x15 => ChannelResponseCode::ChannelInWrongState,
             _ => {
                 debug!("Received ChannelResponseCode: {:x}", self.0[2]);
