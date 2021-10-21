@@ -1,3 +1,5 @@
+/// The Ant module provides the main run() function that when called will startup
+/// the ANT+ USB device if found and configure it to be ready to accept channel configurations.
 use crossbeam_channel::{Receiver, Sender};
 
 use super::Result;
@@ -12,12 +14,12 @@ use crate::{
 
 use log::{debug, error, info, trace};
 
-// Doing this for now, but ANT_NETWORK_KEY will most likely be passed in
-// when Ant::init is called. Whatever app is using this library may be
-// responsible for passing in the ANT_NETWORK_KEY.
+// Default to ANT network 1. The ANT+ USB device can support up to three networks, and appears
+// through testing that devices work on ANT network 1 even though 0 is the public network.
 const ANT_NETWORK: u8 = 1;
 const ANT_NETWORK_KEY: [u8; 8] = [0xB9, 0xA5, 0x21, 0xFB, 0xBD, 0x72, 0xC3, 0x45];
 
+// Manages the state of the ANT+ USB devices.
 #[derive(Debug, PartialEq)]
 enum State {
     NotReady,
@@ -27,6 +29,8 @@ enum State {
 }
 
 // TODO: Rename this to Command
+/// Requests that can be sent to the run loop to either Open/Close a channel, send a message to an
+/// ANT+ device, or Quit the loop closing all open channels.
 pub enum Request {
     OpenChannel(u8, Device),
     CloseChannel(u8),
@@ -34,22 +38,24 @@ pub enum Request {
     Quit,
 }
 
+/// Responses that can be sent out of the run loop. BroadcastData from an ANT+ device or any types
+/// of error that should be handled by the upstream application.
 #[derive(Debug)]
 pub enum Response {
     BroadcastData(BroadcastDataMessage),
     Error(AntError),
 }
 
-// run is a public function that handles getting a USB context and
-// initializing the ANT+ stick. Errors are returned through the transmit side
-// of the ant message channel passed in. In the case of the USB context, if
-// an error is received, an error will be sent back on the channel and then
-// the function will return. If an error is received trying to initialize
-// the ANT+ stick, the error will be returned on the transmit channel and the
-// fucnction will continue to loop as some errors could involve the ANT+ stick
-// not being plugged in. When the ANT+ stick can be initialized, the function
-// will call ANT::init().run() that will reset and startup the ANT+ stick
-// and get it ready for communication.
+/// run is a public function that handles getting a USB context and
+/// initializing the ANT+ stick. Errors are returned through the transmit side
+/// of the ant message channel passed in. In the case of the USB context, if
+/// an error is received, an error will be sent back on the channel and then
+/// the function will return. If an error is received trying to initialize
+/// the ANT+ stick, the error will be returned on the transmit channel and the
+/// fucnction will continue to loop as some errors could involve the ANT+ stick
+/// not being plugged in. When the ANT+ stick can be initialized, the function
+/// will call ANT::init().run() that will reset and startup the ANT+ stick
+/// and get it ready for communication.
 pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
     // Get the USB context. If there is an error, send an Error
     // response over the transmit channel and return.
@@ -93,13 +99,16 @@ pub struct Ant<T: UsbContext> {
     state: State,
     request: Receiver<Request>,
     message: Sender<Response>,
+    // By default we support 8 channels. A typical device could support 3 networks of 8 channels
+    // each, but from testing ANT+ devices I have, they only send data on one network, so only
+    // configure for 8 channels.
     channels: [Option<Channel>; 8],
 }
 
 impl<T: UsbContext> Ant<T> {
     pub fn init(usb_device: UsbDevice<T>, rx: Receiver<Request>, tx: Sender<Response>) -> Ant<T> {
         Ant {
-            usb_device: usb_device,
+            usb_device,
             state: State::NotReady,
             request: rx,
             message: tx,
@@ -107,6 +116,13 @@ impl<T: UsbContext> Ant<T> {
         }
     }
 
+    // This is the main run called after initializing the ANT+ USB device. It handles reading data
+    // from the ANT+ USB device and handling the message, whether its part of the initial
+    // configuration, channel configuration, or broadcast data. If there are no messages to read,
+    // the state of the system will decide if the system needs to be configured, or if configured,
+    // check to see if any messages are waiting to be sent. Should a channel close due to error or
+    // timeout, and the channel is still known, then the channel will be reopened until a request
+    // is sent to close the channel by an upstream application.
     pub fn run(&mut self) -> Result<()> {
         // Check to see if we're already running
         if self.state == State::Running {
@@ -146,10 +162,6 @@ impl<T: UsbContext> Ant<T> {
                     }
                     _ => {}
                 },
-                // TODO: Catch NoDeviceError and continue checking for device.
-                // Set state back to NotReady if state is different. Add ability
-                // to resetup channels if channels had been configured
-                // prior to ANT+ stick being removed and reinserted.
                 Err(e) => return Err(e),
             }
             // Messages handled, let's see if there are any requests to
@@ -158,11 +170,6 @@ impl<T: UsbContext> Ant<T> {
                 match self.request.try_recv() {
                     Ok(request) => match request {
                         Request::OpenChannel(number, device) => {
-                            // TODO: Loop through existing channels to see if channel
-                            // is already assigned. If it is, return an error
-                            // back on message channel. If it doesn't exist,
-                            // push channel into channels vec, and then send a
-                            // message to assign the channel.
                             if self.channels[number as usize].is_some() {
                                 error!("Channel {} already exists", number);
                                 self.message
@@ -206,6 +213,7 @@ impl<T: UsbContext> Ant<T> {
         Ok(())
     }
 
+    // Route handles what to do with the message based on the state of the system.
     fn route(&mut self, message: &DeviceResponse) {
         match self.state {
             State::NotReady => {} // Drop message
