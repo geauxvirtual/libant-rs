@@ -1,16 +1,17 @@
+#![allow(dead_code)]
 /// libant is a Rust implementation for interacting with ANT+ based devices.
 /// The goal of this library is provide a simple interface for initializing
-/// an ANT+ USB device by handling all the setup requirements to prepare the 
+/// an ANT+ USB device by handling all the setup requirements to prepare the
 /// ANT+ USB device to support configuring channels for different device types.
-/// 
+///
 /// The libant run loop takes a request channel receive side for broadcast messages
 /// to be sent to an ANT+ device or a Quit message to shut down the loop and a data channel
-/// transmit side to send data out of the run loop, whether it's broadcast data or 
+/// transmit side to send data out of the run loop, whether it's broadcast data or
 /// event data.
 ///
 /// let (request_tx, request_rx) = libant::unbounded();
 /// let (message_tx, message_rx) = libant::unbounded();
-/// 
+///
 /// In the application, the ant run loop can be started by the following since it is
 /// a blocking process.
 ///
@@ -32,13 +33,11 @@
 ///     match message_rx.recv() {
 ///         Ok(Response::BroadcastData(mesg)) => {
 ///             device.decode_broadcast_data(mesg.data());
-///             // Do something with the device data that has now been decoded 
+///             // Do something with the device data that has now been decoded
 ///             println!("Heartrate: {}", device.heartrate());
 ///         }
 ///     }
 /// }
-
-#![allow(dead_code)]
 pub mod ant;
 pub mod channel;
 mod defines;
