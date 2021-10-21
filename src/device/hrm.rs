@@ -1,6 +1,6 @@
-// Heartrate Monitor device. Each data page contains HR data. Legacy devices
-// only have a data page 0. Newer devices have multiple pages with a MSB bit
-// flip every four pages to signify legacy or newer device.
+/// Heartrate Monitor device. Each data page contains HR data. Legacy devices
+/// only have a data page 0. Newer devices have multiple pages with a MSB bit
+/// flip every four pages to signify legacy or newer device.
 // TODO: Support get capabilities and changing mode of HR device if device
 // supports wimming or running data.
 use crate::message::{combine, AcknowledgeDataMessage};
@@ -21,7 +21,7 @@ pub struct HeartRateMonitor {
     last_heartbeat_event: f32,
     heartbeat_count: u8,
     operating_time: u32,
-    manufactuer_id: u8,
+    manufacturer_id: u8,
     serial_number: u16,
     hardware_version: u8,
     software_version: u8,
@@ -87,47 +87,57 @@ impl HeartRateMonitor {
         self.transmission_type
     }
 
+    /// Decoded heartrate received from broadcast data
     pub fn heartrate(&self) -> u8 {
         self.heartrate
     }
 
-    pub fn manufactuer(&self) -> &str {
-        match self.manufactuer_id {
+    /// Manufacturer of the hardware device
+    // TODO Add a lookup table to use across all devices.
+    pub fn manufacturer(&self) -> &str {
+        match self.manufacturer_id {
             1 => "Garmin",
             32 => "Wahoo Fitness",
             _ => "Unknown",
         }
     }
 
+    /// Serial number of device, typically the ANT+ ID
     pub fn serial_number(&self) -> u16 {
         self.serial_number
     }
 
+    /// Hardware version of the device
     pub fn hardware_version(&self) -> u8 {
         self.hardware_version
     }
 
+    /// Software version of the devices
     pub fn software_version(&self) -> u8 {
         self.software_version
     }
 
+    /// Model number of the device
     pub fn model_number(&self) -> u8 {
         self.model_number
     }
 
-    // Whole number 0 - 100 as percentage. Set to 0xFF if not used.
+    /// Whole number 0 - 100 as percentage. Set to 0xFF if not used.
     pub fn battery_level(&self) -> u8 {
         self.battery_level
     }
 
+    /// Fractional battery voltage provided by the device
     pub fn fractional_battery_voltage(&self) -> f32 {
         self.fractional_battery_voltage as f32 / 256 as f32
     }
 
+    /// Coarse battery voltage provided by the device
     pub fn coarse_battery_voltage(&self) -> u8 {
         self.descriptive_bit_field & 0x0F
     }
 
+    /// Battery status as a str from the data provided by the device.
     pub fn battery_status(&self) -> &str {
         if self.descriptive_bit_field & 0x04 == 0x04 {
             return "New";
@@ -147,7 +157,8 @@ impl HeartRateMonitor {
         return "Unknown";
     }
 
-    // Decode broadcast data received from ANT+ device.
+    /// Decode broadcast data received from ANT+ device.
+    /// Every heartrate broadcast data page includes heartrate data.
     pub fn decode_broadcast_data(&mut self, data: &[u8]) {
         // Check length of slice. Discard for now if not 9.
         if data.len() == 8 {
@@ -158,7 +169,7 @@ impl HeartRateMonitor {
                 0x01 | 0x81 => self.operating_time = combine(&data[1..4]),
                 // Data page 2 Manufacturer Information
                 0x02 | 0x82 => {
-                    self.manufactuer_id = data[1];
+                    self.manufacturer_id = data[1];
                     self.serial_number = combine(&data[2..4]) as u16;
                 }
                 // Data page 3 Product Information
@@ -187,20 +198,20 @@ impl HeartRateMonitor {
         }
     }
 
-    // Sends an Acknowledge data page to the heart rate monitor requesting
-    // the manufactuer information.
-    pub fn request_manufactuer_info(&self, channel_number: u8) -> AcknowledgeDataMessage {
+    /// Sends an Acknowledge data page to the heart rate monitor requesting
+    /// the manufacturer information.
+    pub fn request_manufacturer_info(&self, channel_number: u8) -> AcknowledgeDataMessage {
         AcknowledgeDataMessage::new(channel_number, &self.request_data_page(0x02))
     }
 
-    // Send an Acknowledge data page to the heart rate monitor requesting
-    // the battery status for the heart rate monitor.
+    /// Send an Acknowledge data page to the heart rate monitor requesting
+    /// the battery status for the heart rate monitor.
     pub fn request_battery_status(&self, channel_number: u8) -> AcknowledgeDataMessage {
         AcknowledgeDataMessage::new(channel_number, &self.request_data_page(0x07))
     }
 
-    // The general cknowledge data page to send to the heart rate monitor
-    // requesting a specific page to be sent back to the device.
+    /// The general acknowledge data page to send to the heart rate monitor
+    /// requesting a specific page to be sent back to the device.
     fn request_data_page(&self, page_number: u8) -> [u8; 8] {
         [
             COMMON_DATA_PAGE_70,
