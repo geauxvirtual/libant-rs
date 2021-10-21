@@ -1,3 +1,4 @@
+/// libant library errors. All errors returned from the library are an AntError.
 use crate::message::Message;
 use crossbeam_channel::{SendError, TryRecvError};
 use rusb::Error as USBError;
