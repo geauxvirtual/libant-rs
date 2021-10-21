@@ -21,10 +21,11 @@
 /// All broadcast data is sent directly to the client to handle decoding. The library does provide
 /// helper methods for decoding broadcast data by the client application.
 ///
-/// use libant::device::hrm::{HeartRateMonitor, Device};
+/// use libant::device::{hrm::HeartRateMonitor, Device};
 /// use libant::{Request, Response};
 ///
-/// let device = Device::HeartRateMonitor(HeartRateMonitor::new());
+/// let hrm = HeartRateMonitor::new();
+/// let device = Device::HeartRateMonitor(hrm.clone());
 /// request_tx.send(Request::OpenChannel(0, device)).unwrap();
 ///
 /// Broadcast and event messages can be read through the message_rx receive channel side.
@@ -32,9 +33,9 @@
 /// loop {
 ///     match message_rx.recv() {
 ///         Ok(Response::BroadcastData(mesg)) => {
-///             device.decode_broadcast_data(mesg.data());
+///             hrm.decode_broadcast_data(mesg.data());
 ///             // Do something with the device data that has now been decoded
-///             println!("Heartrate: {}", device.heartrate());
+///             println!("Heartrate: {}", hrm.heartrate());
 ///         }
 ///     }
 /// }
