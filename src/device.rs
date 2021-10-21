@@ -1,6 +1,9 @@
+/// Device enum for passing in the type of device when opening a channel. As new devices
+/// are added to the library, the enum will be extended for each type of device.
 pub mod hrm;
 pub mod weightscale;
 
+// Current supported devices
 use hrm::HeartRateMonitor;
 use weightscale::WeightScale;
 
