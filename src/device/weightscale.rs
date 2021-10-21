@@ -1,3 +1,8 @@
+/// Weightscale device for reading weight and potentially other data from the scale.
+// TODO Finish building out this to support all fields that could be returned from the weightscale.
+// For instance, my test scale supports sending back more data than just weight, however the
+// encoding being use is proprietary compared to the manufacturers newer scale that properly
+// supports the ANT+ device pages for a weightscale.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WeightScale {
     channel_type: u8,
@@ -62,15 +67,19 @@ impl WeightScale {
         self.transmission_type
     }
 
-    // Returns weight in Kilograms
+    /// Returns weight in Kilograms
     pub fn weight(&self) -> f32 {
         self.weight
     }
 
+    /// Returns weight in Pounds.
     pub fn weight_in_pounds(&self) -> f32 {
         self.weight * 2.2
     }
 
+    /// Decode broadcast data from the weightscale.
+    // TODO: Properly decode the page and other pages that are part of the
+    // ANT+ device that can be returned by a weightscale.
     pub fn decode_broadcast_data(&mut self, data: &[u8]) {
         // Check length of slice. Discard for now if not 9.
         if data.len() == 9 {
