@@ -1,3 +1,7 @@
+// TODO Go through this and figure out legacy code from new code.
+/// Message module provides a way for creating messages to send to the ANT+
+/// USB device or ANT+ device along with providing a way to decode messages
+/// received from the ANT+ USB device or ANT+ device sending data on a channel.
 use crate::defines;
 use log::debug;
 use std::convert::TryInto;
@@ -56,6 +60,8 @@ pub const EVENT_RX_SEARCH_TIMEOUT: u8 = 0x01;
 pub const EVENT_CHANNEL_CLOSED: u8 = 0x07;
 pub const CHANNEL_IN_WRONG_STATE: u8 = 0x15;
 
+/// ReadBuffer provides a buffer to through data received from the ANT+ USB device and turn
+/// the data into a Message
 pub struct ReadBuffer {
     index: usize,
     inner: Vec<u8>,
@@ -104,6 +110,11 @@ impl Iterator for ReadBuffer {
     }
 }
 
+/// Responses that can be received from the ANT+ USB device.
+/// Startup are messages received when initially configuring the USB device.
+/// ChannelResponse are messages received from the channel during configuration of the channel or
+/// events received while running.
+/// BroadcastData is data received from ANT+ device.
 #[derive(Debug, PartialEq)]
 pub enum Response {
     Startup(StartupMessage),
@@ -438,69 +449,8 @@ fn startup_reason(data: u8) -> &'static str {
     "unknown reason"
 }
 
-// Decodes message received from ANT+ stick into ant::Message
-//pub fn decode(buf: &[u8]) -> Option<Vec<Message>> {
-//    let mut messages = Vec::new();
-//    let mut index = 0;
-//    loop {
-//        if buf[index] == MESG_TX_SYNC {
-//            let mut checksum = 0;
-//            let len = index + buf[index + 1] as usize + 4;
-//            for i in index..len {
-//                checksum ^= buf[i];
-//            }
-//            if checksum == 0 {
-//                messages.push(process_message(&buf[index..len - 1]));
-//            }
-//            index = len;
-//        } else {
-//            // Index does not equal MESG_TX_SYNC byte, so increment
-//            // index. If index is greater than length, break loop
-//            index += 1;
-//        }
-//        if index >= buf.len() {
-//            break;
-//        }
-//    }
-//    if messages.len() == 0 {
-//        None
-//    } else {
-//       Some(messages)
-//    }
-//}
-
-//pub fn decode_but_diff(buf: &[u8]) -> Option<Vec<Message>> {
-//    let mut messages = Vec::new();
-//    let mut index = 0;
-//    let mut checksum = 0;
-//    let mut len = 0;
-//    for byte in &buf[..] {
-//        match *byte {
-//            MESG_TX_SYNC => {
-//                checksum = 0;
-//                len = index + buf[index + 1] as usize + 4;
-//                checksum ^= byte;
-//            }
-//           _ => {
-//                if checksum == 0 || len == 0 {
-//                    index += 1;
-//                    continue;
-//                }
-//                checksum ^= byte;
-//                if checksum == 0 && len != 0 {
-//                    messages.push(process_message(&buf[index..len - 1]));
-//                    index = len;
-//                }
-//            }
-//        }
-//    }
-//    if messages.len() == 0 {
-//        None
-//    } else {
-//        Some(messages)
-//    }
-//}
-
+/// Process message takes a slice of bytes received in the ReadBuffer and converts the data into
+/// the correct Response
 fn process_message(buf: &[u8]) -> Response {
     match buf[MESG_ID_OFFSET] {
         MESG_STARTUP_MESG_ID => Response::Startup(StartupMessage(buf[MESG_DATA_OFFSET])),
@@ -515,11 +465,6 @@ fn process_message(buf: &[u8]) -> Response {
             unimplemented!();
         }
     }
-    //Message::new(buf[MESG_ID_OFFSET], &buf[MESG_DATA_OFFSET..])
-    //Message {
-    //    id: buf[MESG_ID_OFFSET],
-    //    data: buf[MESG_DATA_OFFSET..].to_vec(),
-    //}
 }
 
 pub fn reset() -> Message {
@@ -542,10 +487,6 @@ pub fn get_channel_id(channel: u8) -> Message {
 
 pub fn assign_channel(channel: u8, channel_type: u8, network: u8) -> Message {
     Message::new(MESG_ASSIGN_CHANNEL_ID, &[channel, channel_type, network])
-    //Message {
-    //    id: MESG_ASSIGN_CHANNEL_ID,
-    //    data: vec![channel, channel_type, network],
-    //}
 }
 
 pub fn set_channel_id(
@@ -605,15 +546,6 @@ pub fn create_channel(channel: u8, device_id: u16, profile: u8) -> Message {
             profile,
         ],
     )
-    //Message {
-    //    id: 0xFE,
-    //    data: vec![
-    //        channel,
-    //        (device_id & 0xFF) as u8,
-    //        ((device_id >> 8) & 0xFF) as u8,
-    //        profile,
-    //    ],
-    //}
 }
 
 // App message to quit our threads for now
@@ -873,27 +805,12 @@ mod test {
         assert_eq!(buf[total_size], checksum);
     }
 
-    //   #[test]
-    //   fn test_decode() {
-    //       let start = std::time::Instant::now();
-    //       let mesg = open_channel(0);
-    //       let buf = decode(&mesg.encode());
-    //       println!("Decode: {:#?}", start.elapsed().as_micros());
-    //       assert!(buf.is_some());
-    //       let m = buf.unwrap();
-    //       assert_eq!(m[0], mesg);
-    //    }
-
     #[test]
     fn test_process_message() {
         let startup_message = Message::new(MESG_STARTUP_MESG_ID, &[0x00]);
         let buf = startup_message.encode();
         let mesg = process_message(&buf);
         assert_eq!(mesg, Response::Startup(StartupMessage(0x00)));
-        //        let buf = reset().encode();
-        //        let mesg = process_message(&buf);
-        //        assert_eq!(mesg.id, MESG_RESET);
-        //        assert_eq!(mesg.data[..], buf[MESG_DATA_OFFSET..]);
     }
 
     // The following tests test message creation. Since we use constants
