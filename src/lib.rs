@@ -24,7 +24,7 @@
 /// use libant::device::{hrm::HeartRateMonitor, Device};
 /// use libant::{Request, Response};
 ///
-/// let hrm = HeartRateMonitor::new();
+/// let mut hrm = HeartRateMonitor::new();
 /// let device = Device::HeartRateMonitor(hrm.clone());
 /// request_tx.send(Request::OpenChannel(0, device)).unwrap();
 ///

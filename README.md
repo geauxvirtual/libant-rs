@@ -21,7 +21,7 @@ let run_handle = std::thread::spawn(move || libant::ant::run(request_rx, message
 use libant::device::{Device, hrm::HeartRateMonitor};
 use libant::{Request, Response};
 
-let hrm = HeartRateMonitor::new();
+let mut hrm = HeartRateMonitor::new();
 let device = Device::HeartRateMonitor(hrm.clone());
 request_tx.send(Request::OpenChannel(0, device)).unwrap();
 
