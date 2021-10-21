@@ -1,3 +1,8 @@
+/// A channel is a means of communication for an ANT+ device. Typcially an ANT+ USB device can
+/// support up to a certain number of channels on each network that it supports. A channel
+/// gets mapped to a single device. Even if multiple devices are sending data, the first device
+/// learned by the channel will have its data routed through the configured channel. If multiple
+/// devices of the same type are to be used, multiple channels need to be opened.
 use crate::device::Device;
 use crate::message::{self, ChannelResponseMessage, Message};
 
@@ -14,6 +19,8 @@ enum State {
     Ready,
 }
 
+/// Channel maintains the channel number, state of the channel, and the device
+/// for the channel configuration parameters.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Channel {
     state: State,
@@ -38,6 +45,8 @@ impl Channel {
     // ReponseNoError. We'll just check to verify the message received
     // is what we expect in the current state, then transition the state or
     // log the error.
+    /// Routes messages for the channel when opening the channel for the specified
+    /// device type.
     pub fn route(&mut self, mesg: &ChannelResponseMessage) -> Option<Message> {
         match self.state {
             State::Assign => {
@@ -100,6 +109,7 @@ impl Channel {
         }
     }
 
+    /// Assigns a channel to the specified network.
     pub fn assign(&self, network: u8) -> Message {
         message::assign_channel(self.number, self.device.channel_type(), network)
     }
@@ -109,6 +119,7 @@ impl Channel {
     //    message::unassign_channel(self.number)
     //}
 
+    /// Sets the channel id based on the device parameters.
     pub fn set_channel_id(&self) -> Message {
         message::set_channel_id(
             self.number,
@@ -118,18 +129,22 @@ impl Channel {
         )
     }
 
+    /// Sets the search timeout.
     pub fn set_hp_search_timeout(&self) -> Message {
         message::set_hp_search_timeout(self.number, self.device.timeout())
     }
 
+    /// Sets the period for the channel for how often a message is expected.
     pub fn set_period(&self) -> Message {
         message::set_channel_period(self.number, self.device.period())
     }
 
+    /// Sets the frequency for the device
     pub fn set_frequency(&self) -> Message {
         message::set_channel_frequency(self.number, self.device.frequency())
     }
 
+    /// Open the channel to start receiving broadcast data from the device.
     pub fn open(&self) -> Message {
         message::open_channel(self.number)
     }
