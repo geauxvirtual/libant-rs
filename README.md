@@ -34,3 +34,15 @@ loop {
         }
     }
 }
+```
+
+## Testing
+
+Library has been tested on Mac OS X, but *should* work on any platform that libusb compiles on.
+
+## TODOs
+
+- [] Add support for powermeters
+- [] Add support for electronic trainers
+- [] Add more error handling
+
