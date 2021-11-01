@@ -235,9 +235,9 @@ mod test {
         let hrm = HeartRateMonitor::new();
         assert_eq!(hrm.channel_type, 0x00);
         assert_eq!(hrm.device_id, 0);
-        assert_eq!(hrm.device_type, 0x77);
+        assert_eq!(hrm.device_type, 0x78);
         assert_eq!(hrm.frequency, 0x39);
-        assert_eq!(hrm.period, 8192);
+        assert_eq!(hrm.period, 8070);
         assert_eq!(hrm.timeout, 10);
     }
 
@@ -251,7 +251,7 @@ mod test {
     #[test]
     fn device_type() {
         let hrm = HeartRateMonitor::new();
-        assert_eq!(hrm.device_type(), 0x77);
+        assert_eq!(hrm.device_type(), 0x78);
     }
 
     #[test]

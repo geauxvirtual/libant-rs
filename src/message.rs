@@ -827,7 +827,7 @@ mod test {
         let mesg = reset();
         //MESG_RESET = 0x4A
         assert_eq!(mesg.id, 0x4A);
-        assert_eq!(mesg.data[..], [0]);
+        assert_eq!(mesg.data[..], [0; 15]);
     }
 
     #[test]
