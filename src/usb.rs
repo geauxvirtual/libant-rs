@@ -64,7 +64,7 @@ impl<T: UsbContext> UsbDevice<T> {
         self.handle
             .read_bulk(USB_ANT_EP_IN, &mut self.buffer, timeout)
             .map(|len| ReadBuffer::new(&self.buffer[..len]))
-            .map_err(|e| AntError::UsbDeviceError(e))
+            .map_err(AntError::UsbDeviceError)
     }
 
     /// Write message to the USB device with a timeout of 1 second.
@@ -75,7 +75,7 @@ impl<T: UsbContext> UsbDevice<T> {
     /// Write message to the USB device with a specified timeout.
     pub fn write_with_timeout(&self, message: &[u8], timeout: Duration) -> Result<usize> {
         self.handle
-            .write_bulk(USB_ANT_EP_OUT, &message, timeout)
-            .map_err(|e| AntError::UsbDeviceError(e))
+            .write_bulk(USB_ANT_EP_OUT, message, timeout)
+            .map_err(AntError::UsbDeviceError)
     }
 }
