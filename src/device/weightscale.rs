@@ -3,6 +3,7 @@
 // For instance, my test scale supports sending back more data than just weight, however the
 // encoding being use is proprietary compared to the manufacturers newer scale that properly
 // supports the ANT+ device pages for a weightscale.
+use crate::message::bytes_to_u16;
 #[derive(Clone, Debug, PartialEq)]
 pub struct WeightScale {
     channel_type: u8,
@@ -87,7 +88,7 @@ impl WeightScale {
                 // First data page includes weight
                 0x01 => {
                     if (data[7] != 0xFF || data[7] != 0xFE) && data[8] != 0xFF {
-                        self.weight = crate::combine(&data[7..]) as f32 / 100.0;
+                        self.weight = bytes_to_u16(&data[7..]) as f32 / 100.0;
                     }
                 }
                 _ => {}

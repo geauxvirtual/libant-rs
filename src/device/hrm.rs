@@ -3,7 +3,7 @@
 /// flip every four pages to signify legacy or newer device.
 // TODO: Support get capabilities and changing mode of HR device if device
 // supports wimming or running data.
-use crate::message::{combine, AcknowledgeDataMessage};
+use crate::message::{bytes_to_u16, bytes_to_u32, AcknowledgeDataMessage};
 
 const COMMON_DATA_PAGE_70: u8 = 0x46;
 
@@ -166,11 +166,11 @@ impl HeartRateMonitor {
                 // Data page 0 Default or unknown data page (legacy)
                 0x00 | 0x80 => {}
                 // Data page 1 Cumulative Operating Time
-                0x01 | 0x81 => self.operating_time = combine(&data[1..4]),
+                0x01 | 0x81 => self.operating_time = bytes_to_u32(&data[1..4]),
                 // Data page 2 Manufacturer Information
                 0x02 | 0x82 => {
                     self.manufacturer_id = data[1];
-                    self.serial_number = combine(&data[2..4]) as u16;
+                    self.serial_number = bytes_to_u16(&data[2..4]);
                 }
                 // Data page 3 Product Information
                 0x03 | 0x83 => {
@@ -192,7 +192,7 @@ impl HeartRateMonitor {
                 }
                 _ => return, //Drop message if none of these pages
             }
-            self.last_heartbeat_event = combine(&data[4..6]) as f32 / 1000 as f32;
+            self.last_heartbeat_event = bytes_to_u16(&data[4..6]) as f32 / 1000_f32;
             self.heartbeat_count = data[6];
             self.heartrate = data[7];
         }

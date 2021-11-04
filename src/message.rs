@@ -419,7 +419,7 @@ impl fmt::Debug for Message {
                 f,
                 "Channel: {:X} Device Number: {:?} Device Type: {:?}",
                 self.data[0],
-                combine(&self.data[1..3]),
+                bytes_to_u16(&self.data[1..3]),
                 device_type(self.data[3])
             ),
             _ => write!(f, "{:?}", self.data),
@@ -616,12 +616,15 @@ pub fn print(m: &Message) {
                     match m.data[1] {
                         4 | 132 => {
                             print!("Data Page: Previous heart beat, ");
-                            print!("Previous heatbeat time: {:?}, ", combine(&m.data[3..5]));
+                            print!(
+                                "Previous heatbeat time: {:?}, ",
+                                bytes_to_u16(&m.data[3..5])
+                            );
                         }
                         2 | 130 => {
                             print!("Data Page: Manufacturer Information, ");
                             print!("Manufacturer: {:?}, ", get_manufacturer(m.data[2]));
-                            print!("Upper serial: {:X}, ", combine(&m.data[3..5]));
+                            print!("Upper serial: {:X}, ", bytes_to_u16(&m.data[3..5]));
                         }
                         3 | 131 => {
                             print!("Data Page: Product Information, ");
@@ -631,25 +634,25 @@ pub fn print(m: &Message) {
                         }
                         1 | 129 => {
                             print!("Data Page: Operating Time, ");
-                            print!("Operating Time: {:?}, ", combine(&m.data[2..5]));
+                            print!("Operating Time: {:?}, ", bytes_to_u32(&m.data[2..5]));
                         }
                         _ => print!("Unknown data page: {:?}, ", m.data[1]),
                     }
-                    print!("Heartbeat event time: {:?}, ", combine(&m.data[5..7]));
+                    print!("Heartbeat event time: {:?}, ", bytes_to_u16(&m.data[5..7]));
                     print!("Heatbeat count: {:?}, ", m.data[7]);
                     println!("Heartbeat: {:?}", m.data[8]);
                 }
                 1 => match m.data[1] {
                     0x10 => {
                         print!("Cadence: {:?}, ", m.data[4]);
-                        println!("Power: {:?}", combine(&m.data[7..]));
+                        println!("Power: {:?}", bytes_to_u16(&m.data[7..]));
                     }
                     0x12 => {
                         print!("Events: {:?}, ", m.data[2]);
                         print!("Ticks: {:?}, ", m.data[3]);
                         print!("Cadence: {:?}, ", m.data[4]);
-                        print!("Period: {:?}, ", combine(&m.data[5..7]));
-                        println!("Torque: {:?}", combine(&m.data[7..]));
+                        print!("Period: {:?}, ", bytes_to_u16(&m.data[5..7]));
+                        println!("Torque: {:?}", bytes_to_u16(&m.data[7..]));
                     }
                     _ => println!("We don't know this page yet: {:X}", m.data[1]),
                 },
@@ -658,7 +661,7 @@ pub fn print(m: &Message) {
         }
         MESG_CHANNEL_ID_ID => {
             print!("Channel: {:X}, ", m.data[0]);
-            print!("Device Number: {:?}, ", combine(&m.data[1..3]));
+            print!("Device Number: {:?}, ", bytes_to_u16(&m.data[1..3]));
             println!("Device Type: {:?}", device_type(m.data[3]));
         }
         _ => println!("We don't know this message yet: {:X}", m.id),
