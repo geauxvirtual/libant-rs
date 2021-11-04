@@ -679,12 +679,41 @@ fn device_type(device_type: u8) -> &'static str {
     }
 }
 
+// TODO This needs to be replaced by two functions. One for a slice of 2 to u16 and a second to
+// cover a slice of 3 or 4 to u32.
 pub fn combine(f: &[u8]) -> u32 {
     match f.len() {
         2 => (f[0] as u32) + ((f[1] as u32) << 8),
         3 => (f[0] as u32) + ((f[1] as u32) << 8) + ((f[2] as u32) << 16),
         4 => (f[0] as u32) + ((f[1] as u32) << 8) + ((f[2] as u32) << 16) + ((f[3] as u32) << 24),
         _ => panic!("Bad data sent to fn combine"),
+    }
+}
+
+// bytes_to_u16 takes a byte slice formatted in [LSB, MSB] and combines the two fields together
+// into a single u16.
+pub(crate) fn bytes_to_u16(b: &[u8]) -> u16 {
+    if b.len() > 2 {
+        log::error!("Slice larger than 2. Returning just first two bytes combined");
+    }
+    match b.len() {
+        1 => b[0] as u16,
+        _ => (b[0] as u16) + ((b[1] as u16) << 8),
+    }
+}
+
+// bytes_to_u32 takes a byte slice formatted in
+// [LSB, MSB], [LSB, DATA ,MSB], or [LSB, DATA, DATA, MSB]
+// and returns a combined u32 value.
+pub(crate) fn bytes_to_u32(b: &[u8]) -> u32 {
+    if b.len() > 4 {
+        log::error!("Slice larger than 4. Returning just first four bytes combined");
+    }
+    match b.len() {
+        1 => b[0] as u32,
+        2 => (b[0] as u32) + ((b[1] as u32) << 8),
+        3 => (b[0] as u32) + ((b[1] as u32) << 8) + ((b[2] as u32) << 16),
+        _ => (b[0] as u32) + ((b[1] as u32) << 8) + ((b[2] as u32) << 16) + ((b[3] as u32) << 24),
     }
 }
 
