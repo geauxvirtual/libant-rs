@@ -134,7 +134,7 @@ impl<T: UsbContext> Ant<T> {
             // See if there are any messages to read
             match self.usb_device.read() {
                 Ok(mut buffer) => {
-                    for mesg in buffer.next() {
+                    for mesg in &mut buffer {
                         trace! {"Routing message response: {:x?}", mesg};
                         self.route(&mesg)
                     }
