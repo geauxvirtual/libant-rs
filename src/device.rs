@@ -6,14 +6,13 @@ pub mod weightscale;
 
 // Current supported devices
 use hrm::HeartRateMonitor;
-use powermeter::PowerMeter;
 use weightscale::WeightScale;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Device {
     WeightScale(WeightScale),
     HeartRateMonitor(HeartRateMonitor),
-    PowerMeter(PowerMeter),
+    PowerMeter(powermeter::ChannelConfig),
 }
 
 impl Device {

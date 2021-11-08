@@ -60,18 +60,59 @@ pub const EVENT_RX_SEARCH_TIMEOUT: u8 = 0x01;
 pub const EVENT_CHANNEL_CLOSED: u8 = 0x07;
 pub const CHANNEL_IN_WRONG_STATE: u8 = 0x15;
 
+pub struct TestBuffer {
+    index: usize,
+    inner: Box<[u8]>,
+}
+
+impl TestBuffer {
+    pub fn new(buffer: &[u8]) -> Self {
+        Self {
+            index: 0,
+            inner: buffer.to_vec().into_boxed_slice(),
+        }
+    }
+}
+
+impl Iterator for TestBuffer {
+    // Use this for now until switch to enum
+    type Item = Response;
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.index >= self.inner.len() {
+                return None;
+            }
+            if self.inner[self.index] == MESG_TX_SYNC {
+                let mut checksum = 0;
+                let index = self.index;
+                // Length of message
+                let len = index + self.inner[index + 1] as usize + 4;
+                // Verify checksum
+                for i in index..len {
+                    checksum ^= self.inner[i];
+                }
+                // Set self.index to current message length
+                if checksum == 0 {
+                    self.index = len;
+                    return Some(process_message(&self.inner[index..len - 1]));
+                }
+            }
+            self.index += 1;
+        }
+    }
+}
 /// ReadBuffer provides a buffer to through data received from the ANT+ USB device and turn
 /// the data into a Message
 pub struct ReadBuffer {
     index: usize,
-    inner: Vec<u8>,
+    inner: Box<[u8]>,
 }
 
 impl ReadBuffer {
     pub fn new(buffer: &[u8]) -> Self {
         ReadBuffer {
             index: 0,
-            inner: buffer.to_vec(),
+            inner: buffer.to_vec().into_boxed_slice(),
         }
     }
 }
@@ -203,34 +244,54 @@ impl ChannelResponseMessage {
 }
 
 // TODO: See if this impacts extended messages. Most likely does.
-#[derive(Clone, Debug, PartialEq)]
-pub struct BroadcastDataMessage([u8; 9]);
-
-impl BroadcastDataMessage {
-    // TODO: Should this return an error if user tries to pass in
-    // data longer than 8?
+pub struct TestBroadcastDataMessage(Box<[u8]>);
+impl TestBroadcastDataMessage {
     pub fn new(channel_number: u8, data: &[u8]) -> Self {
-        let mut buf: [u8; 9] = [0; 9];
+        let mut buf: Box<[u8]> = Box::new([0; 9]);
         buf[0] = channel_number;
         buf[1..].copy_from_slice(data);
         Self(buf)
     }
 
+    pub fn from(mesg: Box<[u8]>) -> Self {
+        Self(mesg)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BroadcastDataMessage {
+    channel_id: u8,
+    data: Box<[u8]>,
+}
+
+impl BroadcastDataMessage {
+    // TODO: Should this return an error if user tries to pass in
+    // data longer than 8?
+    /*pub fn new(channel_number: u8, data: &[u8]) -> Self {
+        let mut buf: [u8; 9] = [0; 9];
+        buf[0] = channel_number;
+        buf[1..].copy_from_slice(data);
+        Self(buf)
+    }*/
+
     pub fn from(mesg: &[u8]) -> Self {
-        Self(mesg.try_into().expect("Wrong number of elements passed"))
+        Self {
+            channel_id: mesg[0],
+            data: mesg[1..].to_vec().into_boxed_slice(),
+        }
     }
 
     pub fn channel(&self) -> u8 {
-        self.0[0]
+        self.channel_id
     }
 
-    pub fn data(&self) -> &[u8] {
-        &self.0[1..]
+    pub fn data(self) -> Box<[u8]> {
+        self.data
     }
 
-    pub fn to_message(&self) -> Message {
-        Message::new(MESG_BROADCAST_DATA_ID, &self.0)
-    }
+    //    pub fn to_message(&self) -> Message {
+    //        Message::new(MESG_BROADCAST_DATA_ID, &self.0)
+    //    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
