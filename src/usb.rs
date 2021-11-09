@@ -5,7 +5,7 @@ use std::time::Duration;
 pub use rusb::{Context, UsbContext};
 use rusb::{DeviceHandle, Error};
 
-use super::{error::AntError, /*message::ReadBuffer,*/ Result};
+use super::{error::AntError, Result};
 
 // TODO ANT settings are currently hardcoded and work with the test
 // USB device, but need to verify if these settings work with other
@@ -15,13 +15,11 @@ const USB_ANT_CONFIGURATION: u8 = 1;
 const USB_ANT_INTERFACE: u8 = 0;
 const USB_ANT_EP_IN: u8 = 0x81;
 const USB_ANT_EP_OUT: u8 = 0x01;
-//const TX_BUF_SIZE: usize = 255;
 
 /// UsbDevice struct that holds the device handle to the USB device
 /// along with a buffer to read data data from.
 pub struct UsbDevice<T: UsbContext> {
     handle: DeviceHandle<T>,
-    //buffer: [u8; TX_BUF_SIZE],
 }
 
 impl<T: UsbContext> UsbDevice<T> {
@@ -34,21 +32,14 @@ impl<T: UsbContext> UsbDevice<T> {
                 match handle.reset() {
                     Ok(_) => {
                         handle.claim_interface(USB_ANT_INTERFACE)?;
-                        return Ok(UsbDevice {
-                            handle,
-                            //                            buffer: [0; TX_BUF_SIZE],
-                        });
                     }
                     Err(Error::NotFound) => {
                         let mut handle = device.open()?;
                         handle.claim_interface(USB_ANT_INTERFACE)?;
-                        return Ok(UsbDevice {
-                            handle,
-                            //                            buffer: [0; TX_BUF_SIZE],
-                        });
                     }
                     Err(e) => return Err(AntError::UsbDeviceError(e)),
                 }
+                return Ok(UsbDevice { handle });
             }
         }
         Err(AntError::UsbDeviceError(Error::NoDevice))
@@ -63,7 +54,6 @@ impl<T: UsbContext> UsbDevice<T> {
     pub fn read_with_timeout(&mut self, buf: &mut [u8], timeout: Duration) -> Result<usize> {
         self.handle
             .read_bulk(USB_ANT_EP_IN, buf, timeout)
-            //            .map(|len| ReadBuffer::new(&self.buffer[..len]))
             .map_err(AntError::UsbDeviceError)
     }
 
