@@ -5,7 +5,7 @@ use std::time::Duration;
 pub use rusb::{Context, UsbContext};
 use rusb::{DeviceHandle, Error};
 
-use super::{error::AntError, message::ReadBuffer, Result};
+use super::{error::AntError, /*message::ReadBuffer,*/ Result};
 
 // TODO ANT settings are currently hardcoded and work with the test
 // USB device, but need to verify if these settings work with other
@@ -15,13 +15,13 @@ const USB_ANT_CONFIGURATION: u8 = 1;
 const USB_ANT_INTERFACE: u8 = 0;
 const USB_ANT_EP_IN: u8 = 0x81;
 const USB_ANT_EP_OUT: u8 = 0x01;
-const TX_BUF_SIZE: usize = 255;
+//const TX_BUF_SIZE: usize = 255;
 
 /// UsbDevice struct that holds the device handle to the USB device
 /// along with a buffer to read data data from.
 pub struct UsbDevice<T: UsbContext> {
     handle: DeviceHandle<T>,
-    buffer: [u8; TX_BUF_SIZE],
+    //buffer: [u8; TX_BUF_SIZE],
 }
 
 impl<T: UsbContext> UsbDevice<T> {
@@ -36,7 +36,7 @@ impl<T: UsbContext> UsbDevice<T> {
                         handle.claim_interface(USB_ANT_INTERFACE)?;
                         return Ok(UsbDevice {
                             handle,
-                            buffer: [0; TX_BUF_SIZE],
+                            //                            buffer: [0; TX_BUF_SIZE],
                         });
                     }
                     Err(Error::NotFound) => {
@@ -44,7 +44,7 @@ impl<T: UsbContext> UsbDevice<T> {
                         handle.claim_interface(USB_ANT_INTERFACE)?;
                         return Ok(UsbDevice {
                             handle,
-                            buffer: [0; TX_BUF_SIZE],
+                            //                            buffer: [0; TX_BUF_SIZE],
                         });
                     }
                     Err(e) => return Err(AntError::UsbDeviceError(e)),
@@ -55,15 +55,15 @@ impl<T: UsbContext> UsbDevice<T> {
     }
 
     /// Read from the USB device with a timeout of 10 milliseconds.
-    pub fn read(&mut self) -> Result<ReadBuffer> {
-        self.read_with_timeout(Duration::from_millis(10))
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        self.read_with_timeout(buf, Duration::from_millis(10))
     }
 
     /// Read from the USB device with the specified timeout.
-    pub fn read_with_timeout(&mut self, timeout: Duration) -> Result<ReadBuffer> {
+    pub fn read_with_timeout(&mut self, buf: &mut [u8], timeout: Duration) -> Result<usize> {
         self.handle
-            .read_bulk(USB_ANT_EP_IN, &mut self.buffer, timeout)
-            .map(|len| ReadBuffer::new(&self.buffer[..len]))
+            .read_bulk(USB_ANT_EP_IN, buf, timeout)
+            //            .map(|len| ReadBuffer::new(&self.buffer[..len]))
             .map_err(AntError::UsbDeviceError)
     }
 

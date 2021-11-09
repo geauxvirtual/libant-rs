@@ -60,60 +60,29 @@ pub const EVENT_RX_SEARCH_TIMEOUT: u8 = 0x01;
 pub const EVENT_CHANNEL_CLOSED: u8 = 0x07;
 pub const CHANNEL_IN_WRONG_STATE: u8 = 0x15;
 
-pub struct TestBuffer {
-    index: usize,
-    inner: Box<[u8]>,
-}
-
-impl TestBuffer {
-    pub fn new(buffer: &[u8]) -> Self {
-        Self {
-            index: 0,
-            inner: buffer.to_vec().into_boxed_slice(),
-        }
-    }
-}
-
-impl Iterator for TestBuffer {
-    // Use this for now until switch to enum
-    type Item = Response;
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.index >= self.inner.len() {
-                return None;
-            }
-            if self.inner[self.index] == MESG_TX_SYNC {
-                let mut checksum = 0;
-                let index = self.index;
-                // Length of message
-                let len = index + self.inner[index + 1] as usize + 4;
-                // Verify checksum
-                for i in index..len {
-                    checksum ^= self.inner[i];
-                }
-                // Set self.index to current message length
-                if checksum == 0 {
-                    self.index = len;
-                    return Some(process_message(&self.inner[index..len - 1]));
-                }
-            }
-            self.index += 1;
-        }
-    }
-}
 /// ReadBuffer provides a buffer to through data received from the ANT+ USB device and turn
 /// the data into a Message
 pub struct ReadBuffer {
     index: usize,
-    inner: Box<[u8]>,
+    inner: [u8; 512],
+    len: usize,
 }
 
 impl ReadBuffer {
-    pub fn new(buffer: &[u8]) -> Self {
+    pub fn new() -> Self {
         ReadBuffer {
             index: 0,
-            inner: buffer.to_vec().into_boxed_slice(),
+            inner: [0; 512],
+            len: 0,
         }
+    }
+
+    pub fn len(&mut self, len: usize) {
+        self.len = len;
+    }
+
+    pub fn inner_as_mut(&mut self) -> &mut [u8] {
+        &mut self.inner
     }
 }
 
@@ -128,7 +97,9 @@ impl Iterator for ReadBuffer {
     type Item = Response;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if self.index >= self.inner.len() {
+            if self.index >= self.len {
+                self.index = 0;
+                self.len = 0;
                 return None;
             }
             if self.inner[self.index] == MESG_TX_SYNC {
@@ -243,25 +214,10 @@ impl ChannelResponseMessage {
     }
 }
 
-// TODO: See if this impacts extended messages. Most likely does.
-pub struct TestBroadcastDataMessage(Box<[u8]>);
-impl TestBroadcastDataMessage {
-    pub fn new(channel_number: u8, data: &[u8]) -> Self {
-        let mut buf: Box<[u8]> = Box::new([0; 9]);
-        buf[0] = channel_number;
-        buf[1..].copy_from_slice(data);
-        Self(buf)
-    }
-
-    pub fn from(mesg: Box<[u8]>) -> Self {
-        Self(mesg)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct BroadcastDataMessage {
     channel_id: u8,
-    data: Box<[u8]>,
+    data: [u8; 8],
 }
 
 impl BroadcastDataMessage {
@@ -274,10 +230,11 @@ impl BroadcastDataMessage {
         Self(buf)
     }*/
 
+    // Maybe change this to try_from and return an error
     pub fn from(mesg: &[u8]) -> Self {
         Self {
             channel_id: mesg[0],
-            data: mesg[1..].to_vec().into_boxed_slice(),
+            data: mesg[1..].try_into().unwrap(),
         }
     }
 
@@ -285,7 +242,7 @@ impl BroadcastDataMessage {
         self.channel_id
     }
 
-    pub fn data(self) -> Box<[u8]> {
+    pub fn data(self) -> [u8; 8] {
         self.data
     }
 
@@ -785,11 +742,14 @@ mod test {
 
     #[test]
     fn test_read_buffer() {
+        let mut read_buffer = ReadBuffer::new();
         let startup_message = Message::new(MESG_STARTUP_MESG_ID, &[0x00]);
         let mut buffer = startup_message.encode();
         buffer.extend_from_slice(&startup_message.encode()[..]);
         buffer.extend_from_slice(&startup_message.encode()[..]);
-        let mut read_buffer = ReadBuffer::new(&buffer[..]);
+        read_buffer.inner_as_mut()[..buffer.len()].copy_from_slice(&buffer[..]);
+        read_buffer.len(buffer.len());
+        //let mut read_buffer = ReadBuffer::new(&buffer[..]);
         assert_eq!(
             read_buffer.next(),
             Some(Response::Startup(StartupMessage(0x00)))
@@ -807,12 +767,14 @@ mod test {
 
     #[test]
     fn test_read_buffer_with_invalid_data() {
+        let mut read_buffer = ReadBuffer::new();
         let startup_message = Message::new(MESG_STARTUP_MESG_ID, &[0x00]);
         let mut buffer = startup_message.encode();
         buffer.extend_from_slice(&startup_message.encode()[..]);
         buffer.extend_from_slice(&[0, 1, 2, 3]);
         buffer.extend_from_slice(&startup_message.encode()[..]);
-        let mut read_buffer = ReadBuffer::new(&buffer[..]);
+        read_buffer.inner_as_mut()[..buffer.len()].copy_from_slice(&buffer[..]);
+        read_buffer.len(buffer.len());
         assert_eq!(
             read_buffer.next(),
             Some(Response::Startup(StartupMessage(0x00)))
@@ -830,12 +792,14 @@ mod test {
 
     #[test]
     fn test_read_buffer_with_invalid_mesg() {
+        let mut read_buffer = ReadBuffer::new();
         let startup_message = Message::new(MESG_STARTUP_MESG_ID, &[0x00]);
         let mut buffer = startup_message.encode();
         buffer.extend_from_slice(&startup_message.encode()[..]);
         buffer.extend_from_slice(&[MESG_TX_SYNC, 1, 2, 0]);
         buffer.extend_from_slice(&startup_message.encode()[..]);
-        let mut read_buffer = ReadBuffer::new(&buffer[..]);
+        read_buffer.inner_as_mut()[..buffer.len()].copy_from_slice(&buffer[..]);
+        read_buffer.len(buffer.len());
         assert_eq!(
             read_buffer.next(),
             Some(Response::Startup(StartupMessage(0x00)))

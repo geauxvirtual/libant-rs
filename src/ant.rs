@@ -8,7 +8,7 @@ use crate::{
     device::Device,
     error::AntError,
     message::Response as DeviceResponse,
-    message::{self, BroadcastDataMessage, ChannelResponseCode, Message},
+    message::{self, BroadcastDataMessage, ChannelResponseCode, Message, ReadBuffer},
     usb::{UsbContext, UsbDevice},
 };
 
@@ -129,12 +129,14 @@ impl<T: UsbContext> Ant<T> {
             return Err(AntError::AlreadyRunning);
         }
         // ANT+ run loop to process/send messages
+        let mut read_buffer = ReadBuffer::new();
         let mut reset_attempts = 0;
         loop {
             // See if there are any messages to read
-            match self.usb_device.read() {
-                Ok(mut buffer) => {
-                    for mesg in &mut buffer {
+            match self.usb_device.read(read_buffer.inner_as_mut()) {
+                Ok(len) => {
+                    read_buffer.len(len);
+                    for mesg in &mut read_buffer {
                         trace! {"Routing message response: {:x?}", mesg};
                         self.route(&mesg)
                     }

@@ -137,7 +137,7 @@ impl PowerMeter {
     // TODO Need to properly handle a stop in pedaling. After a PM has been transmitting
     // and cadence stops, the last event page will be sent continously until the next event
     // occurs. This will result in cadence dropping to 0 while event count remains constant.
-    pub fn decode(&mut self, data: Box<[u8]>) {
+    pub fn decode(&mut self, data: [u8; 8]) {
         match data[0] {
             0x10 => {
                 let p = Page0x10(data);
@@ -220,7 +220,7 @@ enum PedalPower {
 }
 
 #[derive(Debug, PartialEq)]
-struct Page0x10(Box<[u8]>);
+struct Page0x10([u8; 8]);
 
 impl Page0x10 {
     fn event_count(&self) -> u8 {
@@ -250,7 +250,7 @@ impl Page0x10 {
 }
 
 #[derive(Debug, PartialEq)]
-struct Page0x12(Box<[u8]>);
+struct Page0x12([u8; 8]);
 
 impl Page0x12 {
     fn event_count(&self) -> u8 {
