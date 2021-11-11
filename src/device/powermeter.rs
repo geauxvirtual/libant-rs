@@ -146,11 +146,15 @@ impl PowerMeter {
                 // If there is a last page, then we can calculate values from current page
                 // against last page.
                 if let Some(last_page) = &self.last_page_0x10 {
-                    let ec_delta = p.event_count().wrapping_sub(last_page.event_count());
-                    // If last page is same as current page, do nothing
-                    if ec_delta == 0 && p.cadence() != 0 {
+                    // If the current page equals the last page, do nothing.
+                    if *last_page == p {
                         return;
                     }
+                    let ec_delta = p.event_count().wrapping_sub(last_page.event_count());
+                    // If last page is same as current page, do nothing
+                    //if ec_delta == 0 && p.cadence() != 0 {
+                    //    return;
+                    //}
                     let accp_delta = p
                         .accumulated_power()
                         .wrapping_sub(last_page.accumulated_power());
@@ -169,6 +173,10 @@ impl PowerMeter {
                 // If there is a last page, then we can calculate values from current page
                 // against last page.
                 if let Some(last_page) = &self.last_page_0x12 {
+                    // If the current page equals the last page, do nothing.
+                    if *last_page == p {
+                        return;
+                    }
                     // First get deltas from last page to current page
                     let ec_delta = p.event_count().wrapping_sub(last_page.event_count());
                     // If last page event count equals current page event count, just skip.
@@ -178,9 +186,6 @@ impl PowerMeter {
                     // until the next event. This results in cadence and power not dropping
                     // to 0 on the display. Should check for cadence being 0, and then setting
                     // power to 0 as well.
-                    if ec_delta == 0 && p.cadence() != 0 {
-                        return;
-                    }
                     let cp_delta = p.crank_period().wrapping_sub(last_page.crank_period());
                     let acct_delta = p
                         .accumulated_torque()
