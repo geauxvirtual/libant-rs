@@ -112,7 +112,8 @@ impl ChannelConfig {
 #[derive(Default)]
 pub struct PowerMeter {
     cadence: u8,
-    average_power: u16,
+    average_power: u16, //TODO Change this to just power
+    pedal_power: Option<PedalPower>,
     last_page_0x10: Option<Page0x10>,
     last_page_0x12: Option<Page0x12>,
 }
@@ -120,6 +121,7 @@ pub struct PowerMeter {
 impl PowerMeter {
     pub fn new() -> Self {
         Self {
+            pedal_power: None,
             last_page_0x10: None,
             last_page_0x12: None,
             ..Default::default()
@@ -156,6 +158,9 @@ impl PowerMeter {
                         self.cadence = p.cadence();
                     }
                     self.average_power = (accp_delta as f32 / ec_delta as f32).round() as u16;
+                    if p.pedal_power().is_valid() {
+                        self.pedal_power = Some(p.pedal_power());
+                    }
                 }
                 self.last_page_0x10 = Some(p);
             } // Power Only page,
@@ -217,6 +222,12 @@ impl PowerMeter {
 enum PedalPower {
     Right(u8),
     Unknown(u8),
+}
+
+impl PedalPower {
+    fn is_valid(&self) -> bool {
+        !matches!(self, Self::Right(0xFF) | Self::Unknown(0xFF))
+    }
 }
 
 #[derive(Debug, PartialEq)]
