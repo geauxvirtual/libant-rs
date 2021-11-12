@@ -112,7 +112,7 @@ impl ChannelConfig {
 #[derive(Default)]
 pub struct PowerMeter {
     cadence: u8,
-    average_power: u16, //TODO Change this to just power
+    power: u16,
     pedal_power: Option<PedalPower>,
     last_page_0x10: Option<Page0x10>,
     last_page_0x12: Option<Page0x12>,
@@ -132,8 +132,8 @@ impl PowerMeter {
         self.cadence
     }
 
-    pub fn average_power(&self) -> u16 {
-        self.average_power
+    pub fn power(&self) -> u16 {
+        self.power
     }
 
     // TODO Need to properly handle a stop in pedaling. After a PM has been transmitting
@@ -161,7 +161,7 @@ impl PowerMeter {
                     if p.cadence() != 0xFF {
                         self.cadence = p.cadence();
                     }
-                    self.average_power = (accp_delta as f32 / ec_delta as f32).round() as u16;
+                    self.power = (accp_delta as f32 / ec_delta as f32).round() as u16;
                     if p.pedal_power().is_valid() {
                         self.pedal_power = Some(p.pedal_power());
                     }
@@ -202,20 +202,7 @@ impl PowerMeter {
                     let angular_velo =
                         (2_f32 * PI * ec_delta as f32) / (cp_delta as f32 / 2048_f32);
                     let avg_torque = acct_delta as f32 / (32_f32 * ec_delta as f32);
-                    self.average_power = (avg_torque * angular_velo).round() as u16;
-                    if self.average_power == 0 || self.average_power == 65535 {
-                        log::debug!(
-                            "\nLast page:\n{}\nCurrent page:\n{}\nPower: {:?}\nAngular Velo: {}\nAverage Torque: {}\nEC_DELTA: {}\nCP_DELTA: {}\nACCT_DELTA: {}",
-                            last_page,
-                            p,
-                            self.average_power,
-                            angular_velo,
-                            avg_torque,
-                            ec_delta,
-                            cp_delta,
-                            acct_delta
-                        );
-                    }
+                    self.power = (avg_torque * angular_velo).round() as u16;
                 }
                 self.last_page_0x12 = Some(p);
             } // Torque at Crank page
@@ -332,14 +319,14 @@ mod test {
         let page1: [u8; 8] = [0x10, 0xc5, 0xb1, 0x4b, 0x22, 0xc3, 0x57, 0x00];
         pm.decode(page1);
         assert_eq!(pm.cadence, 0);
-        assert_eq!(pm.average_power, 0);
+        assert_eq!(pm.power, 0);
         assert_eq!(pm.last_page_0x10, Some(Page0x10(page1)));
         let page2: [u8; 8] = [0x10, 0xc6, 0xb1, 0x4c, 0x78, 0xce, 0x56, 0x00];
         pm.decode(page2);
         assert_eq!(pm.cadence, page2[3]);
         let to_u16 = |data: &[u8]| (data[0] as u16) + ((data[1] as u16) << 8);
         let power = to_u16(&page2[4..6]).wrapping_sub(to_u16(&page1[4..6]));
-        assert_eq!(pm.average_power, power);
+        assert_eq!(pm.power, power);
     }
 
     #[test]
@@ -348,7 +335,7 @@ mod test {
         let page1: [u8; 8] = [0x12, 0x44, 0x44, 0x4b, 0xce, 0xfe, 0x3d, 0xed];
         pm.decode(page1);
         assert_eq!(pm.cadence, 0);
-        assert_eq!(pm.average_power, 0);
+        assert_eq!(pm.power, 0);
         assert_eq!(pm.last_page_0x12, Some(Page0x12(page1)));
         let page2: [u8; 8] = [0x12, 0x45, 0x45, 0x4b, 0x2c, 0x05, 0x9e, 0xee];
         pm.decode(page2);
@@ -360,6 +347,6 @@ mod test {
         let angular_velo = (2_f32 * PI * ec_delta as f32) / (cp_delta as f32 / 2048_f32);
         let avg_torque = acct_delta as f32 / (32_f32 * ec_delta as f32);
         let power = (avg_torque * angular_velo).round() as u16;
-        assert_eq!(pm.average_power, power);
+        assert_eq!(pm.power, power);
     }
 }
