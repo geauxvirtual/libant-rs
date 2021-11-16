@@ -1,3 +1,4 @@
+use super::Page0x52;
 use crate::message::bytes_to_u16;
 use std::f32::consts::PI;
 
@@ -116,24 +117,55 @@ pub struct PowerMeter {
     pedal_power: Option<PedalPower>,
     last_page_0x10: Option<Page0x10>,
     last_page_0x12: Option<Page0x12>,
+    page_0x52: Option<Page0x52>,
 }
 
 impl PowerMeter {
     pub fn new() -> Self {
         Self {
             pedal_power: None,
+            page_0x52: None,
             last_page_0x10: None,
             last_page_0x12: None,
             ..Default::default()
         }
     }
 
+    // Instantaneous cadence from each pages 0x10 and 0x12. If instantaneous cadence
+    // isn't set on 0x12, then it's calculated from the data provided.
     pub fn cadence(&self) -> u8 {
         self.cadence
     }
 
+    // Power is calcualted from previous and current 0x10 or 0x12 pages. Instantaneous power
+    // on 0x10 is not used.
     pub fn power(&self) -> u16 {
         self.power
+    }
+
+    // From page 0x10, power meter can report right power or unknown power. If the field
+    // isn't valid, then None is returned. If right is signaled, then a tuple is returned with
+    // left/right data. If unknown is set, then we'll just assume it's for right and send
+    // back left/right.
+    pub fn pedal_power(&self) -> Option<(u8, u8)> {
+        if let Some(pedal_power) = &self.pedal_power {
+            return Some(pedal_power.distribution());
+        }
+        None
+    }
+
+    pub fn battery_status(&self) -> &str {
+        if let Some(page) = &self.page_0x52 {
+            return page.battery_status();
+        }
+        "--"
+    }
+
+    pub fn battery_voltage(&self) -> Option<f32> {
+        if let Some(page) = &self.page_0x52 {
+            return page.battery_voltage();
+        }
+        None
     }
 
     // TODO Need to properly handle a stop in pedaling. After a PM has been transmitting
@@ -163,6 +195,7 @@ impl PowerMeter {
                     }
                     self.power = (accp_delta as f32 / ec_delta as f32).round() as u16;
                     if p.pedal_power().is_valid() {
+                        log::debug!("pedal power: {:?}", p.pedal_power());
                         self.pedal_power = Some(p.pedal_power());
                     }
                 }
@@ -206,11 +239,13 @@ impl PowerMeter {
                 }
                 self.last_page_0x12 = Some(p);
             } // Torque at Crank page
+            0x52 => self.page_0x52 = Some(Page0x52(data)),
             _ => {} // Do nothing with rest of pages for now.
         }
     }
 }
 
+#[derive(Debug)]
 enum PedalPower {
     Right(u8),
     Unknown(u8),
@@ -218,7 +253,14 @@ enum PedalPower {
 
 impl PedalPower {
     fn is_valid(&self) -> bool {
-        !matches!(self, Self::Right(0xFF) | Self::Unknown(0xFF))
+        log::debug!("pedal power: {:?}", self);
+        !matches!(self, Self::Right(0x7F) | Self::Unknown(0x7F))
+    }
+
+    fn distribution(&self) -> (u8, u8) {
+        match self {
+            Self::Right(value) | Self::Unknown(value) => (100 - value, *value),
+        }
     }
 }
 
@@ -231,7 +273,8 @@ impl Page0x10 {
     }
 
     fn pedal_power(&self) -> PedalPower {
-        let p = self.0[2] & 0xEF;
+        let p = self.0[2] & 0x7F;
+        log::debug!("[2]: {:?}, p: {:?}", self.0[2], p);
         if self.0[2] & 0x80 == 0x80 {
             PedalPower::Right(p)
         } else {
