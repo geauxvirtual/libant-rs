@@ -77,6 +77,7 @@ impl Device {
 
 // Common data pages across device types.
 // Page 0x50 - Manufacturer Information
+#[derive(Debug, Copy, Clone)]
 pub struct Page0x50([u8; 8]);
 
 impl Page0x50 {
@@ -84,8 +85,8 @@ impl Page0x50 {
         self.0[3]
     }
 
-    pub fn manufacturer_id(&self) -> u16 {
-        bytes_to_u16(&self.0[4..6])
+    pub fn manufacturer(&self) -> Manufacturer {
+        Manufacturer::from(bytes_to_u16(&self.0[4..6]))
     }
 
     pub fn model_number(&self) -> u16 {
@@ -93,6 +94,7 @@ impl Page0x50 {
     }
 }
 // Page 0x51 - Product Information
+#[derive(Debug, Copy, Clone)]
 pub struct Page0x51([u8; 8]);
 
 impl Page0x51 {
@@ -110,6 +112,7 @@ impl Page0x51 {
     }
 }
 // Page 0x52 - Battery Status
+#[derive(Debug, Copy, Clone)]
 pub struct Page0x52([u8; 8]);
 
 impl Page0x52 {
@@ -129,24 +132,8 @@ impl Page0x52 {
         (bytes_to_u32(&self.0[3..6]) * self.time_resolution() as u32) as f32 / 3600_f32
     }
 
-    pub fn battery_status(&self) -> &str {
-        if self.0[7] & 0x10 == 0x10 {
-            return "New";
-        }
-        if self.0[7] & 0x20 == 0x20 {
-            return "Good";
-        }
-        if self.0[7] & 0x30 == 0x30 {
-            return "Ok";
-        }
-        if self.0[7] & 0x40 == 0x40 {
-            return "Low";
-        }
-        if self.0[7] & 0x50 == 0x50 {
-            return "Critical";
-        }
-        // If our bit matching doesn't match anything, just return "Invalid"
-        "Invalid"
+    pub fn battery_status(&self) -> BatteryStatus {
+        BatteryStatus::from(self.0[7])
     }
 
     // Time resolution for operating time in seconds.
@@ -160,5 +147,107 @@ impl Page0x52 {
 
     fn coarse_voltage(&self) -> u8 {
         self.0[7] & 0x0F
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum BatteryStatus {
+    New,
+    Good,
+    Ok,
+    Low,
+    Critical,
+    Invalid,
+}
+
+impl BatteryStatus {
+    fn from(value: u8) -> Self {
+        if value & 0x10 == 0x10 {
+            return Self::New;
+        }
+        if value & 0x20 == 0x20 {
+            return Self::Good;
+        }
+        if value & 0x30 == 0x30 {
+            return Self::Ok;
+        }
+        if value & 0x40 == 0x40 {
+            return Self::Low;
+        }
+        if value & 0x50 == 0x50 {
+            return Self::Critical;
+        }
+        // If our bit matching doesn't match anything, just return "Invalid"
+        Self::Invalid
+    }
+}
+
+impl std::fmt::Display for BatteryStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let status = match *self {
+            Self::New => "New",
+            Self::Good => "Good",
+            Self::Ok => "Ok",
+            Self::Low => "Low",
+            Self::Critical => "Critical",
+            Self::Invalid => "Invalid",
+        };
+        write!(f, "{}", status)
+    }
+}
+
+// Sent as a u16. Matching Manufacturer to value can be found in a spreadsheet in the SDK.
+#[derive(Debug, Clone)]
+pub enum Manufacturer {
+    Garmin,
+    SRM,
+    Quarq,
+    Saxonar,
+    WahooFitness,
+    Shimano,
+    Rotor,
+    StagesCycling,
+    Campagnolo,
+    Favero,
+    SRAM,
+    Undefined,
+}
+
+impl Manufacturer {
+    fn from(value: u16) -> Self {
+        match value {
+            1 => Self::Garmin,
+            6 => Self::SRM,
+            7 => Self::Quarq,
+            29 => Self::Saxonar,
+            32 => Self::WahooFitness,
+            41 => Self::Shimano,
+            60 => Self::Rotor,
+            69 => Self::StagesCycling,
+            100 => Self::Campagnolo,
+            263 => Self::Favero,
+            268 => Self::SRAM,
+            _ => Self::Undefined,
+        }
+    }
+}
+
+impl std::fmt::Display for Manufacturer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let manufacturer = match *self {
+            Self::Garmin => "Garmin",
+            Self::SRM => "SRM",
+            Self::Quarq => "Quarq",
+            Self::Saxonar => "Saxonar",
+            Self::WahooFitness => "Wahoo Fitness",
+            Self::Shimano => "Shimano",
+            Self::Rotor => "Rotor",
+            Self::StagesCycling => "Stages Cycling",
+            Self::Campagnolo => "Campagnolo",
+            Self::Favero => "Favero",
+            Self::SRAM => "SRAM",
+            Self::Undefined => "Undefined",
+        };
+        write!(f, "{}", manufacturer)
     }
 }

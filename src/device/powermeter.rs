@@ -1,4 +1,4 @@
-use super::Page0x52;
+use super::{BatteryStatus, Manufacturer, Page0x50, Page0x51, Page0x52};
 use crate::message::bytes_to_u16;
 use std::f32::consts::PI;
 
@@ -110,13 +110,15 @@ impl ChannelConfig {
 // Page 0xE0 -> Right Force Angle
 // Page 0xE1 -> Left Force Angle
 // Page 0xE2 -> Pedal Position data
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PowerMeter {
     cadence: u8,
     power: u16,
     pedal_power: Option<PedalPower>,
     last_page_0x10: Option<Page0x10>,
     last_page_0x12: Option<Page0x12>,
+    page_0x50: Option<Page0x50>,
+    page_0x51: Option<Page0x51>,
     page_0x52: Option<Page0x52>,
 }
 
@@ -124,6 +126,8 @@ impl PowerMeter {
     pub fn new() -> Self {
         Self {
             pedal_power: None,
+            page_0x50: None,
+            page_0x51: None,
             page_0x52: None,
             last_page_0x10: None,
             last_page_0x12: None,
@@ -154,16 +158,30 @@ impl PowerMeter {
         None
     }
 
-    pub fn battery_status(&self) -> &str {
+    pub fn battery_status(&self) -> Option<BatteryStatus> {
         if let Some(page) = &self.page_0x52 {
-            return page.battery_status();
+            return Some(page.battery_status());
         }
-        "--"
+        None
     }
 
     pub fn battery_voltage(&self) -> Option<f32> {
         if let Some(page) = &self.page_0x52 {
             return page.battery_voltage();
+        }
+        None
+    }
+
+    pub fn serial_number(&self) -> Option<u32> {
+        if let Some(page) = &self.page_0x51 {
+            return Some(page.serial_number());
+        }
+        None
+    }
+
+    pub fn manufacturer(&self) -> Option<Manufacturer> {
+        if let Some(page) = &self.page_0x50 {
+            return Some(page.manufacturer());
         }
         None
     }
@@ -239,13 +257,23 @@ impl PowerMeter {
                 }
                 self.last_page_0x12 = Some(p);
             } // Torque at Crank page
+            0x50 => {
+                if self.page_0x50.is_none() {
+                    self.page_0x50 = Some(Page0x50(data));
+                }
+            }
+            0x51 => {
+                if self.page_0x51.is_none() {
+                    self.page_0x51 = Some(Page0x51(data));
+                }
+            }
             0x52 => self.page_0x52 = Some(Page0x52(data)),
             _ => {} // Do nothing with rest of pages for now.
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum PedalPower {
     Right(u8),
     Unknown(u8),
@@ -264,7 +292,7 @@ impl PedalPower {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct Page0x10([u8; 8]);
 
 impl Page0x10 {
@@ -295,7 +323,7 @@ impl Page0x10 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct Page0x12([u8; 8]);
 
 impl Page0x12 {
