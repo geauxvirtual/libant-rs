@@ -1,5 +1,5 @@
 use super::{BatteryStatus, Manufacturer, Page0x50, Page0x51, Page0x52};
-use crate::message::bytes_to_u16;
+use crate::message::{bytes_to_u16, AcknowledgeDataMessage};
 use std::f32::consts::PI;
 
 // Constant values for PowerMeter channel.
@@ -115,8 +115,10 @@ pub struct PowerMeter {
     cadence: u8,
     power: u16,
     pedal_power: Option<PedalPower>,
+    calibration_value: Option<i16>,
     last_page_0x10: Option<Page0x10>,
     last_page_0x12: Option<Page0x12>,
+    page_0x01: Option<Page0x01>,
     page_0x50: Option<Page0x50>,
     page_0x51: Option<Page0x51>,
     page_0x52: Option<Page0x52>,
@@ -125,7 +127,9 @@ pub struct PowerMeter {
 impl PowerMeter {
     pub fn new() -> Self {
         Self {
+            calibration_value: None,
             pedal_power: None,
+            page_0x01: None,
             page_0x50: None,
             page_0x51: None,
             page_0x52: None,
@@ -186,11 +190,26 @@ impl PowerMeter {
         None
     }
 
+    pub fn calibration_value(&self) -> Option<i16> {
+        self.calibration_value
+    }
+
     // TODO Need to properly handle a stop in pedaling. After a PM has been transmitting
     // and cadence stops, the last event page will be sent continously until the next event
     // occurs. This will result in cadence dropping to 0 while event count remains constant.
     pub fn decode(&mut self, data: [u8; 8]) {
         match data[0] {
+            0x01 => {
+                // We received a calibration page. The calibration page is overloaded and can be
+                // one of many. The page will be stored but also store the calibration value
+                // because the calibration response page could be overwritten by one of the
+                // autozero pages.
+                let p = Page0x01(data);
+                if p.calibration_value().is_some() {
+                    self.calibration_value = p.calibration_value();
+                }
+                self.page_0x01 = Some(p);
+            }
             0x10 => {
                 let p = Page0x10(data);
                 // If there is a last page, then we can calculate values from current page
@@ -213,7 +232,6 @@ impl PowerMeter {
                     }
                     self.power = (accp_delta as f32 / ec_delta as f32).round() as u16;
                     if p.pedal_power().is_valid() {
-                        log::debug!("pedal power: {:?}", p.pedal_power());
                         self.pedal_power = Some(p.pedal_power());
                     }
                 }
@@ -281,7 +299,6 @@ enum PedalPower {
 
 impl PedalPower {
     fn is_valid(&self) -> bool {
-        log::debug!("pedal power: {:?}", self);
         !matches!(self, Self::Right(0x7F) | Self::Unknown(0x7F))
     }
 
@@ -292,6 +309,72 @@ impl PedalPower {
     }
 }
 
+enum CalibrationMessage {
+    Response,
+    AutozeroSupport,
+    Unknown,
+}
+
+enum AutozeroStatus {
+    Enabled,
+    Disabled,
+    Unsupported,
+}
+
+enum AutozeroConfig {
+    OffEnableNotSupported,
+    OffEnableSupported,
+    OnEnableNotSupported,
+    OnEnableSupported,
+}
+
+// Calibration Data Page.
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct Page0x01([u8; 8]);
+
+impl Page0x01 {
+    fn message_type(&self) -> CalibrationMessage {
+        match self.0[1] {
+            0xAC | 0xAF => CalibrationMessage::Response,
+            0x12 => CalibrationMessage::AutozeroSupport,
+            _ => CalibrationMessage::Unknown, // Should never see
+        }
+    }
+
+    fn autozero_status(&self) -> Option<AutozeroStatus> {
+        match self.message_type() {
+            CalibrationMessage::Response => match self.0[2] {
+                0x00 => Some(AutozeroStatus::Disabled),
+                0x01 => Some(AutozeroStatus::Enabled),
+                0xFF => Some(AutozeroStatus::Unsupported),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn calibration_value(&self) -> Option<i16> {
+        match self.message_type() {
+            CalibrationMessage::Response => Some(bytes_to_u16(&self.0[6..]) as i16),
+            _ => None,
+        }
+    }
+
+    fn autozero_configuration(&self) -> Option<AutozeroConfig> {
+        match self.message_type() {
+            CalibrationMessage::AutozeroSupport => match self.0[2] {
+                0x00 => Some(AutozeroConfig::OffEnableNotSupported),
+                0x01 => Some(AutozeroConfig::OffEnableSupported),
+                0x02 => Some(AutozeroConfig::OnEnableNotSupported),
+                0x03 => Some(AutozeroConfig::OnEnableSupported),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+// Standard Power Page
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct Page0x10([u8; 8]);
 
@@ -302,7 +385,6 @@ impl Page0x10 {
 
     fn pedal_power(&self) -> PedalPower {
         let p = self.0[2] & 0x7F;
-        log::debug!("[2]: {:?}, p: {:?}", self.0[2], p);
         if self.0[2] & 0x80 == 0x80 {
             PedalPower::Right(p)
         } else {
@@ -323,6 +405,7 @@ impl Page0x10 {
     }
 }
 
+// Standard Crank Torque Data Page
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct Page0x12([u8; 8]);
 
@@ -361,6 +444,10 @@ impl fmt::Display for Page0x12 {
             self.accumulated_torque()
         )
     }
+}
+
+pub fn manual_calibration(channel: u8) -> AcknowledgeDataMessage {
+    AcknowledgeDataMessage::new(channel, &[0x01, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 }
 
 #[cfg(test)]
