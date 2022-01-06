@@ -3,8 +3,63 @@
 /// gets mapped to a single device. Even if multiple devices are sending data, the first device
 /// learned by the channel will have its data routed through the configured channel. If multiple
 /// devices of the same type are to be used, multiple channels need to be opened.
-use crate::device::Device;
 use crate::message::{self, ChannelResponseMessage, Message};
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Config {
+    device_id: u16,
+    device_type: u8,
+    channel_type: u8,
+    frequency: u8,
+    period: u16,
+    timeout: u8,
+    transmission_type: u8,
+}
+
+impl Config {
+    pub fn new() -> Self {
+        Config {
+            channel_type: 0x00,
+            timeout: 30,
+            ..Default::default()
+        }
+    }
+
+    pub fn device_id(mut self, device_id: u16) -> Self {
+        self.device_id = device_id;
+        self
+    }
+
+    pub fn device_type(mut self, device_type: u8) -> Self {
+        self.device_type = device_type;
+        self
+    }
+
+    pub fn channel_type(mut self, channel_type: u8) -> Self {
+        self.channel_type = channel_type;
+        self
+    }
+
+    pub fn frequency(mut self, frequency: u8) -> Self {
+        self.frequency = frequency;
+        self
+    }
+
+    pub fn period(mut self, period: u16) -> Self {
+        self.period = period;
+        self
+    }
+
+    pub fn timeout(mut self, timeout: u8) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    pub fn transmission_type(mut self, transmission_type: u8) -> Self {
+        self.transmission_type = transmission_type;
+        self
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 enum State {
@@ -25,11 +80,11 @@ enum State {
 pub struct Channel {
     state: State,
     number: u8,
-    device: Device,
+    device: Config,
 }
 
 impl Channel {
-    pub fn new(number: u8, device: Device) -> Self {
+    pub fn new(number: u8, device: Config) -> Self {
         Channel {
             state: State::Assign,
             number,
@@ -111,7 +166,7 @@ impl Channel {
 
     /// Assigns a channel to the specified network.
     pub fn assign(&self, network: u8) -> Message {
-        message::assign_channel(self.number, self.device.channel_type(), network)
+        message::assign_channel(self.number, self.device.channel_type, network)
     }
 
     // Probably not needed
@@ -123,25 +178,25 @@ impl Channel {
     pub fn set_channel_id(&self) -> Message {
         message::set_channel_id(
             self.number,
-            self.device.device_id(),
-            self.device.device_type(),
-            self.device.transmission_type(),
+            self.device.device_id,
+            self.device.device_type,
+            self.device.transmission_type,
         )
     }
 
     /// Sets the search timeout.
     pub fn set_hp_search_timeout(&self) -> Message {
-        message::set_hp_search_timeout(self.number, self.device.timeout())
+        message::set_hp_search_timeout(self.number, self.device.timeout)
     }
 
     /// Sets the period for the channel for how often a message is expected.
     pub fn set_period(&self) -> Message {
-        message::set_channel_period(self.number, self.device.period())
+        message::set_channel_period(self.number, self.device.period)
     }
 
     /// Sets the frequency for the device
     pub fn set_frequency(&self) -> Message {
-        message::set_channel_frequency(self.number, self.device.frequency())
+        message::set_channel_frequency(self.number, self.device.frequency)
     }
 
     /// Open the channel to start receiving broadcast data from the device.
@@ -161,13 +216,10 @@ mod test {
 
     #[test]
     fn new() {
-        let device = Device::WeightScale(crate::device::weightscale::WeightScale::new());
-        let channel = Channel::new(0, device);
+        let config = Config::new();
+        let channel = Channel::new(0, config);
         assert_eq!(channel.state, State::Assign);
         assert_eq!(channel.number, 0);
-        assert_eq!(
-            channel.device,
-            Device::WeightScale(crate::device::weightscale::WeightScale::new())
-        );
+        assert_eq!(channel.device, Config::new());
     }
 }

@@ -4,8 +4,7 @@ use crossbeam_channel::{Receiver, Sender};
 
 use super::Result;
 use crate::{
-    channel::Channel,
-    device::Device,
+    channel::{Channel, Config},
     error::AntError,
     message::Response as DeviceResponse,
     message::{self, BroadcastDataMessage, ChannelResponseCode, Message, ReadBuffer},
@@ -32,7 +31,7 @@ enum State {
 /// Requests that can be sent to the run loop to either Open/Close a channel, send a message to an
 /// ANT+ device, or Quit the loop closing all open channels.
 pub enum Request {
-    OpenChannel(u8, Device),
+    OpenChannel(u8, Config),
     CloseChannel(u8),
     Send(Message),
     Quit,

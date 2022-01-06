@@ -1,3 +1,4 @@
+use crate::channel::Config;
 /// Heartrate Monitor device. Each data page contains HR data. Legacy devices
 /// only have a data page 0. Newer devices have multiple pages with a MSB bit
 /// flip every four pages to signify legacy or newer device.
@@ -5,18 +6,15 @@
 // supports wimming or running data.
 use crate::message::{bytes_to_u16, bytes_to_u32, AcknowledgeDataMessage};
 
+const HRM_DEVICE_TYPE: u8 = 0x78;
+const HRM_FREQUENCY: u8 = 0x39;
+const HRM_PERIOD: u16 = 8070;
+const HRM_TIMEOUT: u8 = 10;
 const COMMON_DATA_PAGE_70: u8 = 0x46;
 
 // TODO Split out channel config from device broadcast data
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HeartRateMonitor {
-    channel_type: u8,
-    device_id: u16,
-    device_type: u8,
-    frequency: u8,
-    period: u16,
-    timeout: u8,
-    transmission_type: u8,
     heartrate: u8,
     last_heartbeat_event: f32,
     heartbeat_count: u8,
@@ -34,57 +32,16 @@ pub struct HeartRateMonitor {
 impl HeartRateMonitor {
     pub fn new() -> Self {
         HeartRateMonitor {
-            channel_type: 0x00,
-            device_id: 0,
-            device_type: 0x78,
-            frequency: 0x39,
-            period: 8070,
-            timeout: 10,
-            transmission_type: 0, //set to 0 for pairing if unknown
             ..Default::default()
         }
     }
 
-    pub fn set_device_id(&mut self, device_id: u16) -> &mut Self {
-        self.device_id = device_id;
-        self
-    }
-
-    pub fn set_transmission_type(&mut self, transmission_type: u8) -> &mut Self {
-        self.transmission_type = transmission_type;
-        self
-    }
-
-    pub fn build(&self) -> Self {
-        self.clone()
-    }
-
-    pub fn device_id(&self) -> u16 {
-        self.device_id
-    }
-
-    pub fn channel_type(&self) -> u8 {
-        self.channel_type
-    }
-
-    pub fn device_type(&self) -> u8 {
-        self.device_type
-    }
-
-    pub fn frequency(&self) -> u8 {
-        self.frequency
-    }
-
-    pub fn period(&self) -> u16 {
-        self.period
-    }
-
-    pub fn timeout(&self) -> u8 {
-        self.timeout
-    }
-
-    pub fn transmission_type(&self) -> u8 {
-        self.transmission_type
+    pub fn channel_config() -> Config {
+        Config::new()
+            .device_type(HRM_DEVICE_TYPE)
+            .frequency(HRM_FREQUENCY)
+            .period(HRM_PERIOD)
+            .timeout(HRM_TIMEOUT)
     }
 
     /// Decoded heartrate received from broadcast data
@@ -226,7 +183,9 @@ impl HeartRateMonitor {
     }
 }
 
-#[cfg(test)]
+// TODO Move this testing under crate::channel and focus device testing on decoding
+// of data.
+/*#[cfg(test)]
 mod test {
     use super::*;
 
@@ -259,4 +218,4 @@ mod test {
         let hrm = HeartRateMonitor::new();
         assert_eq!(hrm.channel_type(), 0x00);
     }
-}
+}*/

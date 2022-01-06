@@ -1,4 +1,5 @@
 use super::{BatteryStatus, Manufacturer, Page0x50, Page0x51, Page0x52};
+use crate::channel::Config;
 use crate::message::{bytes_to_u16, AcknowledgeDataMessage};
 use std::f32::consts::PI;
 
@@ -8,92 +9,6 @@ const PM_DEVICE_TYPE: u8 = 0x0B;
 const PM_FREQUENCY: u8 = 0x39;
 const PM_EIGHT_HZ: u16 = 8182;
 const PM_FOUR_HZ: u16 = 4091;
-
-// ChannelConfig contains all fields of a channel for a PowerMeter that can change depending on
-// if a device is being searched for or already known.
-// TODO This may get reworked back to a single struct, or a maybe a config field inside a single
-// struct that also holds the decoded data.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ChannelConfig {
-    device_id: u16,
-    transmission_type: u8,
-    period: DevicePeriod,
-    timeout: u8,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum DevicePeriod {
-    EightHertz,
-    FourHertz,
-}
-
-impl Default for ChannelConfig {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ChannelConfig {
-    pub fn new() -> Self {
-        Self {
-            device_id: 0,                     // Set to 0 when searching for a device
-            transmission_type: 0,             // Set to 0 when pairing
-            period: DevicePeriod::EightHertz, // Set to 8hz by default, but some devices could transmit at 4hz. Would need to close and re-open channel with new config.
-            timeout: 30,
-        }
-    }
-
-    pub fn set_device_id(mut self, id: u16) -> Self {
-        self.device_id = id;
-        self
-    }
-
-    pub fn set_transmission_type(mut self, transmission_type: u8) -> Self {
-        self.transmission_type = transmission_type;
-        self
-    }
-
-    pub fn set_period(mut self, period: DevicePeriod) -> Self {
-        self.period = period;
-        self
-    }
-
-    pub fn set_timeout(mut self, timeout: u8) -> Self {
-        self.timeout = timeout;
-        self
-    }
-
-    pub fn device_id(&self) -> u16 {
-        self.device_id
-    }
-
-    pub fn channel_type(&self) -> u8 {
-        PM_CHANNEL_TYPE
-    }
-
-    pub fn device_type(&self) -> u8 {
-        PM_DEVICE_TYPE
-    }
-
-    pub fn frequency(&self) -> u8 {
-        PM_FREQUENCY
-    }
-
-    pub fn timeout(&self) -> u8 {
-        self.timeout
-    }
-
-    pub fn period(&self) -> u16 {
-        match self.period {
-            DevicePeriod::EightHertz => PM_EIGHT_HZ,
-            DevicePeriod::FourHertz => PM_FOUR_HZ,
-        }
-    }
-
-    pub fn transmission_type(&self) -> u8 {
-        self.transmission_type
-    }
-}
 
 // PowerMeter provides a way to decode and use the broadcast data sent from the PowerMeter.
 // Page 0x01 -> Calibration Messages
@@ -139,6 +54,12 @@ impl PowerMeter {
         }
     }
 
+    pub fn channel_config() -> Config {
+        Config::new()
+            .device_type(PM_DEVICE_TYPE)
+            .frequency(PM_FREQUENCY)
+            .period(PM_EIGHT_HZ)
+    }
     // Instantaneous cadence from each pages 0x10 and 0x12. If instantaneous cadence
     // isn't set on 0x12, then it's calculated from the data provided.
     pub fn cadence(&self) -> u8 {
@@ -453,23 +374,6 @@ pub fn manual_calibration(channel: u8) -> AcknowledgeDataMessage {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn new() {
-        let pm = ChannelConfig::new();
-        assert_eq!(pm.channel_type(), PM_CHANNEL_TYPE);
-        assert_eq!(pm.device_id(), 0);
-        assert_eq!(pm.device_type(), PM_DEVICE_TYPE);
-        assert_eq!(pm.frequency(), PM_FREQUENCY);
-        assert_eq!(pm.period(), PM_EIGHT_HZ);
-        assert_eq!(pm.timeout(), 30);
-    }
-
-    #[test]
-    fn set_device_id() {
-        let pm = ChannelConfig::new().set_device_id(12345);
-        assert_eq!(pm.device_id(), 12345);
-    }
 
     #[test]
     fn test_powermeter_decode_page0x10() {
