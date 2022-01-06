@@ -20,13 +20,12 @@
 /// Internally, the library manages configured channels for channel configuration data only.
 /// All broadcast data is sent directly to the client to handle decoding. The library does provide
 /// helper methods for decoding broadcast data by the client application.
-///
-/// use libant::device::{hrm::HeartRateMonitor, Device};
+/// use libant::channel::Config
+/// use libant::device::hrm::HeartRateMonitor;
 /// use libant::{Request, Response};
 ///
 /// let mut hrm = HeartRateMonitor::new();
-/// let device = Device::HeartRateMonitor(hrm.clone());
-/// request_tx.send(Request::OpenChannel(0, device)).unwrap();
+/// request_tx.send(Request::OpenChannel(0, HeartRateMonitor::channel_config())).unwrap();
 ///
 /// Broadcast and event messages can be read through the message_rx receive channel side.
 ///
