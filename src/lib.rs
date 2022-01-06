@@ -20,7 +20,6 @@
 /// Internally, the library manages configured channels for channel configuration data only.
 /// All broadcast data is sent directly to the client to handle decoding. The library does provide
 /// helper methods for decoding broadcast data by the client application.
-/// use libant::channel::Config
 /// use libant::device::hrm::HeartRateMonitor;
 /// use libant::{Request, Response};
 ///

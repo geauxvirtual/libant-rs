@@ -17,13 +17,11 @@ let (message_tx, message_rx) = libant::unbounded();
 let run_handle = std::thread::spawn(move || libant::ant::run(request_rx, message_tx));
 
 // Configure a channel for a specific type of device.
-
-use libant::device::{Device, hrm::HeartRateMonitor};
+use libant::device::hrm::HeartRateMonitor;
 use libant::{Request, Response};
 
 let mut hrm = HeartRateMonitor::new();
-let device = Device::HeartRateMonitor(hrm.clone());
-request_tx.send(Request::OpenChannel(0, device)).unwrap();
+request_tx.send(Request::OpenChannel(0, HeartRateMonitor::channel_config())).unwrap();
 
 // Now that the channel is open, process any broadcast data messages
 loop {
