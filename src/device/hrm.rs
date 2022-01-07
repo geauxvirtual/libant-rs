@@ -86,7 +86,7 @@ impl HeartRateMonitor {
 
     /// Fractional battery voltage provided by the device
     pub fn fractional_battery_voltage(&self) -> f32 {
-        self.fractional_battery_voltage as f32 / 256 as f32
+        self.fractional_battery_voltage as f32 / 256_f32
     }
 
     /// Coarse battery voltage provided by the device
@@ -111,7 +111,7 @@ impl HeartRateMonitor {
         if self.descriptive_bit_field & 0x24 == 0x24 {
             return "Critical";
         }
-        return "Unknown";
+        "Unknown"
     }
 
     /// Decode broadcast data received from ANT+ device.
