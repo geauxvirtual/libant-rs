@@ -169,11 +169,6 @@ impl Channel {
         message::assign_channel(self.number, self.device.channel_type, network)
     }
 
-    // Probably not needed
-    //pub fn unassign(&self) -> Message {
-    //    message::unassign_channel(self.number)
-    //}
-
     /// Sets the channel id based on the device parameters.
     pub fn set_channel_id(&self) -> Message {
         message::set_channel_id(
@@ -203,11 +198,6 @@ impl Channel {
     pub fn open(&self) -> Message {
         message::open_channel(self.number)
     }
-
-    // Probably not needed
-    //pub fn close(&self) -> Message {
-    //    message::close_channel(self.number)
-    //}
 }
 
 #[cfg(test)]

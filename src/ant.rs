@@ -305,7 +305,7 @@ impl<T: UsbContext> Ant<T> {
                                 // request channel here. May have to rethink
                                 // how that gets created and handled, or figure out
                                 // a better way to send the next message.
-                                if let Some(mesg) = c.route(&mesg) {
+                                if let Some(mesg) = c.route(mesg) {
                                     let _ = self.usb_device.write(&mesg.encode());
                                 }
                             }
@@ -316,10 +316,7 @@ impl<T: UsbContext> Ant<T> {
                                 mesg.channel()
                             );
                         }
-                        _ => {
-                            trace!("Unhandled channel response received: {:x?}", mesg);
-                            return;
-                        }
+                        _ => trace!("Unhandled channel response received: {:x?}", mesg),
                     }
                 }
                 DeviceResponse::BroadcastData(mesg) => self
