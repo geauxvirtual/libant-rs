@@ -37,6 +37,37 @@
 ///         }
 ///     }
 /// }
+///
+/// To handle multiple devices, an enum can be utilized.
+/// use libant::device::hrm::HeartRateMonitor;
+/// use libant::device::powermeter::PowerMeter;
+///
+/// enum Device {
+///     Hrm(HeartRateMonitor),
+///     Pm(PowerMeter),
+/// }
+///
+/// // ANT+ USB sticks support up to 8 channels.
+/// let mut channels: [Option<Device>; 8] = Default::default();
+///
+/// channel[0] = Some(Device::Pm(PowerMeter::new());
+/// channel[1] = Some(Device::Hrm(HeartRateMonitor::new());
+///
+/// request_tx.send(Request::OpenChannel(0, PowerMeter::channel_config())).unwrap();
+/// request_tx.send(Request::OpenChannel(1, HeartRateMonitor::channel_config())).unwrap();
+///
+/// loop {
+///     match message_rx.recv() {
+///         Ok(Response::BroadcastData(mesg)) => {
+///             let channel = mesg.channel() as usize;
+///             match channels[channel] {
+///                 Some(Device::Pm(ref mut device)) => { //decode data and handle it },
+///                 Some(Device::Hrm(ref mut device)) => { // decode data and handle it },
+///                 None => unimplemented!(),
+///             }
+///         }
+///     }
+/// }
 pub mod ant;
 pub mod channel;
 mod defines;
