@@ -2,63 +2,68 @@
 /// Message module provides a way for creating messages to send to the ANT+
 /// USB device or ANT+ device along with providing a way to decode messages
 /// received from the ANT+ USB device or ANT+ device sending data on a channel.
-use crate::defines;
 use log::debug;
 use std::convert::TryInto;
 use std::fmt;
 
-pub const MESG_TX_SYNC: u8 = 0xA4;
-pub const MESG_RX_SYNC: u8 = 0xA5;
-pub const MESG_SYNC_SIZE: usize = 1;
-pub const MESG_SIZE_SIZE: usize = 1;
-pub const MESG_ID_SIZE: usize = 1;
-pub const MESG_CHANNEL_NUM_SIZE: usize = 1;
-pub const MESG_EXT_MESG_BF_SIZE: usize = 1;
-pub const MESG_CHECKSUM_SIZE: usize = 1;
-pub const MESG_DATA_SIZE: usize = 9;
+// Starting to figure out legacy vs what's needed to support what this library
+// is being used for right now. I know some of these values and names were taken
+// from the ANT+ SDK.
+const ANT_STANDARD_DATA_PAYLOAD_SIZE: usize = 8;
+const ANT_EXT_MESG_DEVICE_ID_FIELD_SIZE: usize = 4;
+const ANT_EXT_STRING_SIZE: usize = 27;
 
-pub const MESG_ANT_MAX_PAYLOAD_SIZE: usize = defines::ANT_STANDARD_DATA_PAYLOAD_SIZE;
-pub const MESG_MAX_EXT_DATA_SIZE: usize =
-    defines::ANT_EXT_MESG_DEVICE_ID_FIELD_SIZE + defines::ANT_EXT_STRING_SIZE;
-pub const MESG_MAX_DATA_SIZE: usize =
+const MESG_TX_SYNC: u8 = 0xA4;
+const MESG_RX_SYNC: u8 = 0xA5;
+const MESG_SYNC_SIZE: usize = 1;
+const MESG_SIZE_SIZE: usize = 1;
+const MESG_ID_SIZE: usize = 1;
+const MESG_CHANNEL_NUM_SIZE: usize = 1;
+const MESG_EXT_MESG_BF_SIZE: usize = 1;
+const MESG_CHECKSUM_SIZE: usize = 1;
+const MESG_DATA_SIZE: usize = 9;
+
+const MESG_ANT_MAX_PAYLOAD_SIZE: usize = ANT_STANDARD_DATA_PAYLOAD_SIZE;
+const MESG_MAX_EXT_DATA_SIZE: usize = ANT_EXT_MESG_DEVICE_ID_FIELD_SIZE + ANT_EXT_STRING_SIZE;
+const MESG_MAX_DATA_SIZE: usize =
     MESG_ANT_MAX_PAYLOAD_SIZE + MESG_EXT_MESG_BF_SIZE + MESG_MAX_EXT_DATA_SIZE;
-pub const MESG_MAX_SIZE_VALUE: usize = MESG_MAX_DATA_SIZE + MESG_CHANNEL_NUM_SIZE;
-pub const MESG_BUFFER_SIZE: usize =
+const MESG_MAX_SIZE_VALUE: usize = MESG_MAX_DATA_SIZE + MESG_CHANNEL_NUM_SIZE;
+const MESG_BUFFER_SIZE: usize =
     MESG_SIZE_SIZE + MESG_ID_SIZE + MESG_CHANNEL_NUM_SIZE + MESG_MAX_DATA_SIZE + MESG_CHECKSUM_SIZE;
-pub const MESG_FRAMED_SIZE: usize = MESG_ID_SIZE + MESG_CHANNEL_NUM_SIZE + MESG_MAX_DATA_SIZE;
-pub const MESG_HEADER_SIZE: usize = MESG_SYNC_SIZE + MESG_SIZE_SIZE + MESG_ID_SIZE;
-pub const MESG_FRAME_SIZE: usize = MESG_HEADER_SIZE + MESG_CHECKSUM_SIZE;
-pub const MESG_MAX_SIZE: usize = MESG_MAX_DATA_SIZE + MESG_FRAME_SIZE;
-pub const MESG_SIZE_OFFSET: usize = MESG_SYNC_SIZE;
-pub const MESG_ID_OFFSET: usize = MESG_SYNC_SIZE + MESG_SIZE_SIZE;
-pub const MESG_DATA_OFFSET: usize = MESG_HEADER_SIZE;
-pub const MESG_RECOMMENDED_BUFFER_SIZE: u8 = 64;
+const MESG_FRAMED_SIZE: usize = MESG_ID_SIZE + MESG_CHANNEL_NUM_SIZE + MESG_MAX_DATA_SIZE;
+const MESG_HEADER_SIZE: usize = MESG_SYNC_SIZE + MESG_SIZE_SIZE + MESG_ID_SIZE;
+const MESG_FRAME_SIZE: usize = MESG_HEADER_SIZE + MESG_CHECKSUM_SIZE;
+const MESG_MAX_SIZE: usize = MESG_MAX_DATA_SIZE + MESG_FRAME_SIZE;
+const MESG_SIZE_OFFSET: usize = MESG_SYNC_SIZE;
+const MESG_ID_OFFSET: usize = MESG_SYNC_SIZE + MESG_SIZE_SIZE;
+const MESG_DATA_OFFSET: usize = MESG_HEADER_SIZE;
+const MESG_RECOMMENDED_BUFFER_SIZE: u8 = 64;
 
-pub const RESPONSE_NO_ERROR: u8 = 0x00;
-pub const MESG_EVENT_ID: u8 = 0x01;
-pub const MESG_RESPONSE_EVENT_ID: u8 = 0x40;
-pub const MESG_UNASSIGN_CHANNEL_ID: u8 = 0x41;
+const RESPONSE_NO_ERROR: u8 = 0x00;
+const MESG_EVENT_ID: u8 = 0x01;
+const MESG_RESPONSE_EVENT_ID: u8 = 0x40;
+const MESG_UNASSIGN_CHANNEL_ID: u8 = 0x41;
 pub const MESG_ASSIGN_CHANNEL_ID: u8 = 0x42;
 pub const MESG_CHANNEL_MESG_PERIOD_ID: u8 = 0x43;
 pub const MESG_CHANNEL_SEARCH_TIMEOUT_ID: u8 = 0x44;
 pub const MESG_CHANNEL_RADIO_FREQ_ID: u8 = 0x45;
-pub const MESG_NETWORK_KEY_ID: u8 = 0x46;
-pub const MESG_RESET: u8 = 0x4A;
+const MESG_NETWORK_KEY_ID: u8 = 0x46;
+const MESG_RESET: u8 = 0x4A;
 pub const MESG_OPEN_CHANNEL_ID: u8 = 0x4B;
-pub const MESG_CLOSE_CHANNEL_ID: u8 = 0x4C;
-pub const MESG_REQUEST: u8 = 0x4D;
-pub const MESG_BROADCAST_DATA_ID: u8 = 0x4E;
-pub const MESG_ACKNOWLEDGE_DATA_ID: u8 = 0x4F;
+const MESG_CLOSE_CHANNEL_ID: u8 = 0x4C;
+const MESG_REQUEST: u8 = 0x4D;
+const MESG_BROADCAST_DATA_ID: u8 = 0x4E;
+const MESG_ACKNOWLEDGE_DATA_ID: u8 = 0x4F;
 pub const MESG_CHANNEL_ID_ID: u8 = 0x51;
-pub const MESG_CAPABILITIES_ID: u8 = 0x54;
-pub const MESG_STARTUP_MESG_ID: u8 = 0x6F;
-pub const MESG_CREATE_CHANNEL_ID: u8 = 0xFE;
+const MESG_CAPABILITIES_ID: u8 = 0x54;
+const MESG_STARTUP_MESG_ID: u8 = 0x6F;
+const MESG_CREATE_CHANNEL_ID: u8 = 0xFE;
 // Not part of ANT+ standard. Using as control message for quitting
 const MESG_QUIT: u8 = 0xFF;
 
-pub const EVENT_RX_SEARCH_TIMEOUT: u8 = 0x01;
-pub const EVENT_CHANNEL_CLOSED: u8 = 0x07;
-pub const CHANNEL_IN_WRONG_STATE: u8 = 0x15;
+const EVENT_RX_SEARCH_TIMEOUT: u8 = 0x01;
+const EVENT_CHANNEL_CLOSED: u8 = 0x07;
+const CHANNEL_IN_WRONG_STATE: u8 = 0x15;
 
 /// ReadBuffer provides a buffer to through data received from the ANT+ USB device and turn
 /// the data into a Message
@@ -221,15 +226,6 @@ pub struct BroadcastDataMessage {
 }
 
 impl BroadcastDataMessage {
-    // TODO: Should this return an error if user tries to pass in
-    // data longer than 8?
-    /*pub fn new(channel_number: u8, data: &[u8]) -> Self {
-        let mut buf: [u8; 9] = [0; 9];
-        buf[0] = channel_number;
-        buf[1..].copy_from_slice(data);
-        Self(buf)
-    }*/
-
     // Maybe change this to try_from and return an error
     pub fn from(mesg: &[u8]) -> Self {
         Self {
@@ -245,10 +241,6 @@ impl BroadcastDataMessage {
     pub fn data(self) -> [u8; 8] {
         self.data
     }
-
-    //    pub fn to_message(&self) -> Message {
-    //        Message::new(MESG_BROADCAST_DATA_ID, &self.0)
-    //    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -300,6 +292,7 @@ impl Message {
     pub fn encode(&self) -> Vec<u8> {
         let size = self.data.len();
         let total_size = MESG_HEADER_SIZE + size;
+        // TODO Figure out why we are increasing size of buffer by 3 again.
         let mut buf: Vec<u8> = vec![0; total_size + 3];
         buf[0] = MESG_TX_SYNC;
         buf[MESG_SIZE_OFFSET] = size as u8;
