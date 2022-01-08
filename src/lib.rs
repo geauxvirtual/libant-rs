@@ -70,7 +70,6 @@
 /// }
 pub mod ant;
 pub mod channel;
-mod defines;
 pub mod device;
 mod error;
 pub mod message;
