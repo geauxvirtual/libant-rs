@@ -564,8 +564,9 @@ pub fn quit() -> Message {
     Message::new(MESG_QUIT, &[0])
 }
 
+// Legacy debugging print. Will remove at a future date
 // This is for debugging purposes only right now as we build the app
-pub fn print(m: &Message) {
+/*pub fn print(m: &Message) {
     match m.id {
         MESG_STARTUP_MESG_ID => {
             println!("Message id: MESG_STARTUP_MESG_ID");
@@ -678,14 +679,9 @@ pub fn print(m: &Message) {
         _ => println!("We don't know this message yet: {:X}", m.id),
     }
 }
+*/
 
-fn get_manufacturer(id: u8) -> &'static str {
-    match id {
-        32 => "Wahoo",
-        _ => "Unknown",
-    }
-}
-
+// TODO Move to src/device.rs and create a proper enum for this.
 fn device_type(device_type: u8) -> &'static str {
     match device_type {
         0x78 => "Heartrate monitor",
