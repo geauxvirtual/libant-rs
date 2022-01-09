@@ -272,6 +272,19 @@ impl AcknowledgeDataMessage {
     }
 }
 
+// Message is the low-level representation of a message to send to the ANT+ USB
+// stick or ANT+ device.
+// id: Type of message being transmitted.
+// data: Data payload to transmit with the message. Data length varies based on type
+// of message being transmitted.
+//
+// Byte layout of a message where N is length of data payload
+// [0] - Sync byte
+// [1] - Size of data payload
+// [2] - ID of the message
+// [3..N+2] - Data payload
+// [N+3] - Checksum
+
 #[derive(Clone, PartialEq)]
 pub struct Message {
     pub id: u8,
@@ -289,21 +302,16 @@ impl Message {
 
     // Converts a message into something that can be written out
     pub fn encode(&self) -> Vec<u8> {
-        let size = self.data.len();
-        let total_size = MESG_HEADER_SIZE + size;
-        // TODO Figure out why we are increasing size of buffer by 3 again.
-        let mut buf: Vec<u8> = vec![0; total_size + 3];
+        let size = MESG_HEADER_SIZE + self.data.len() + MESG_CHECKSUM_SIZE;
+        let mut buf: Vec<u8> = vec![0; size];
         buf[0] = MESG_TX_SYNC;
-        buf[MESG_SIZE_OFFSET] = size as u8;
+        buf[MESG_SIZE_OFFSET] = self.data.len() as u8;
         buf[MESG_ID_OFFSET] = self.id;
-        buf[MESG_DATA_OFFSET..total_size].copy_from_slice(&self.data);
+        buf[MESG_DATA_OFFSET..(size - 1)].copy_from_slice(&self.data);
 
-        let mut checksum = 0;
-        // Calulcate checksum
-        for i in 0..total_size {
-            checksum ^= buf[i];
-        }
-        buf[total_size] = checksum;
+        // Calculate checksum and store it in the last byte of the message.
+        // Checksum is the XOR of all bytes of the message.
+        buf[size - 1] = checksum(&buf[..size - 1]);
         buf
     }
 
@@ -317,6 +325,10 @@ impl Message {
             _ => "Unknown message",
         }
     }
+}
+
+fn checksum(buf: &[u8]) -> u8 {
+    buf[1..].iter().fold(buf[0], |acc, x| acc ^ x)
 }
 
 /// Process message takes a slice of bytes received in the ReadBuffer and converts the data into
@@ -543,21 +555,21 @@ mod test {
 
     #[test]
     fn test_encode() {
-        let data = vec![1, 0xac, 2, 0x5c, 3];
-        let len = data.len();
-        let m = Message::new(MESG_CAPABILITIES_ID, &data);
+        let data = [MESG_TX_SYNC, 5, MESG_CAPABILITIES_ID, 1, 0xac, 2, 0x5c, 3];
+        let m = Message::new(data[2], &data[3..]);
         let buf = m.encode();
-        let mut checksum = 0;
-        let total_size = buf.len() - 3;
-        for i in 0..total_size {
-            checksum ^= buf[i];
-        }
-        assert_eq!(buf[0], MESG_TX_SYNC);
-        assert_eq!(buf[1], len as u8);
+        let checksum = checksum(&data);
+        assert_eq!(buf[0], data[0]);
+        assert_eq!(buf[1], data[1]);
         //MESG_CAPABILITIES_ID = 0x54
-        assert_eq!(buf[2], 0x54);
-        assert_eq!(buf[3..8], data[..]);
-        assert_eq!(buf[total_size], checksum);
+        assert_eq!(buf[2], data[2]);
+        assert_eq!(buf[3..8], data[3..]);
+        assert_eq!(buf[8], checksum);
+    }
+
+    #[test]
+    fn test_checksum() {
+        assert_eq!(checksum(&[2, 3]), 1);
     }
 
     #[test]
