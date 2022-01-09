@@ -107,16 +107,11 @@ impl Iterator for ReadBuffer {
                 return None;
             }
             if self.inner[self.index] == MESG_TX_SYNC {
-                let mut checksum = 0;
                 let index = self.index;
                 // Length of message
                 let len = index + self.inner[index + 1] as usize + 4;
                 // Verify checksum
-                for i in index..len {
-                    checksum ^= self.inner[i];
-                }
-                // Set self.index to current message length
-                if checksum == 0 {
+                if checksum(&self.inner[index..len]) == 0 {
                     self.index = len;
                     return Some(process_message(&self.inner[index..len - 1]));
                 }
