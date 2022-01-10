@@ -1,3 +1,4 @@
+use super::BatteryStatus;
 use crate::channel::Config;
 /// Heartrate Monitor device. Each data page contains HR data. Legacy devices
 /// only have a data page 0. Newer devices have multiple pages with a MSB bit
@@ -95,23 +96,8 @@ impl HeartRateMonitor {
     }
 
     /// Battery status as a str from the data provided by the device.
-    pub fn battery_status(&self) -> &str {
-        if self.descriptive_bit_field & 0x04 == 0x04 {
-            return "New";
-        }
-        if self.descriptive_bit_field & 0x10 == 0x10 {
-            return "Good";
-        }
-        if self.descriptive_bit_field & 0x14 == 0x14 {
-            return "Ok";
-        }
-        if self.descriptive_bit_field & 0x20 == 0x20 {
-            return "Low";
-        }
-        if self.descriptive_bit_field & 0x24 == 0x24 {
-            return "Critical";
-        }
-        "Unknown"
+    pub fn battery_status(&self) -> BatteryStatus {
+        BatteryStatus::from(self.descriptive_bit_field)
     }
 
     /// Decode broadcast data received from ANT+ device.
