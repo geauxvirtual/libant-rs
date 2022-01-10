@@ -1,4 +1,4 @@
-use super::BatteryStatus;
+use super::{BatteryStatus, Manufacturer};
 use crate::channel::Config;
 /// Heartrate Monitor device. Each data page contains HR data. Legacy devices
 /// only have a data page 0. Newer devices have multiple pages with a MSB bit
@@ -51,13 +51,9 @@ impl HeartRateMonitor {
     }
 
     /// Manufacturer of the hardware device
-    // TODO Add a lookup table to use across all devices.
-    pub fn manufacturer(&self) -> &str {
-        match self.manufacturer_id {
-            1 => "Garmin",
-            32 => "Wahoo Fitness",
-            _ => "Unknown",
-        }
+    /// HRM devices use a u8 field while other devices use u16.
+    pub fn manufacturer(&self) -> Manufacturer {
+        Manufacturer::from(self.manufacturer_id as u16)
     }
 
     /// Serial number of device, typically the ANT+ ID
