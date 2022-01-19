@@ -40,7 +40,7 @@ Library has been tested on Mac OS X, but *should* work on any platform that libu
 
 ## TODOs
 
-- [ ] Add support for powermeters
+- [ ] Add support for powermeters (In Progress)
 - [ ] Add support for electronic trainers
 - [ ] Add more error handling
 
