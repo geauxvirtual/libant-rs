@@ -75,7 +75,52 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
 
     // Loop here looking for the ANT+ stick. If the user has not plugged
     // in the ANT+ stick, check every 1 second.
-    let usb_device = loop {
+    // From time to time, sending a reset message fails. Lets try re-initialzing the UsbDevice
+    // if we receive a Reset error. Try three times, then fail.
+    let mut reset_attempts = 0;
+    loop {
+        match UsbDevice::init(&mut ctx) {
+            Ok(device) => {
+                let e = match Ant::init(device, rx.clone(), tx.clone()).run() {
+                    Ok(()) => {
+                        debug!("Ant::init()::run() exited successfully. Exiting...");
+                        break;
+                    }
+                    Err(AntError::Reset) => {
+                        // Tried resetting the ANT+ stick three times and failed.
+                        if reset_attempts <= 2 {
+                            debug!("Failed to reset ANT+ stick. Re-intializing USB device");
+                            reset_attempts += 1;
+                            continue;
+                        }
+                        error!("Error resetting the ANT+ stick");
+                        Response::Error(AntError::Reset)
+                    }
+                    Err(e) => {
+                        error!("Error initializing ANT+ stick: {:?}", e);
+                        Response::Error(e)
+                    }
+                };
+                tx.send(e).unwrap();
+                break;
+            }
+            Err(e @ AntError::UsbDeviceError(rusb::Error::NoDevice)) => {
+                // If no USB stick is present, the error is returned over the channel
+                // and the thread sleeps for 1s. This is an infinite loop waiting on the user
+                // to plug in an ANT+ USB device.
+                debug!("No ANT+ stick found. Sleeping for 1s");
+                tx.send(Response::Error(e)).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+            }
+            Err(e) => {
+                // Error initializng the USB device. Send the error up and then break the loop.
+                error!("Error initializing ANT+ USB stick: {:?}", e);
+                tx.send(Response::Error(e)).unwrap();
+                break;
+            }
+        }
+    }
+    /*let usb_device = loop {
         match UsbDevice::init(&mut ctx) {
             Ok(device) => break device,
             Err(e) => {
@@ -90,7 +135,7 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
     // received back through transmit channel.
     if let Err(e) = Ant::init(usb_device, rx, tx.clone()).run() {
         tx.send(Response::Error(e)).unwrap();
-    }
+    }*/
 }
 
 struct Ant<T: UsbContext> {
