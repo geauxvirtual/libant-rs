@@ -77,6 +77,6 @@ mod usb;
 
 pub type Result<T> = std::result::Result<T, error::AntError>;
 
-pub use ant::{Ant, Request, Response};
+pub use ant::{Request, Response};
 pub use crossbeam_channel::{unbounded, Receiver, Sender};
 pub use usb::Context;

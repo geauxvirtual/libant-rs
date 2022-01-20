@@ -93,7 +93,7 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
     }
 }
 
-pub struct Ant<T: UsbContext> {
+struct Ant<T: UsbContext> {
     usb_device: UsbDevice<T>,
     state: State,
     request: Receiver<Request>,
@@ -105,7 +105,7 @@ pub struct Ant<T: UsbContext> {
 }
 
 impl<T: UsbContext> Ant<T> {
-    pub fn init(usb_device: UsbDevice<T>, rx: Receiver<Request>, tx: Sender<Response>) -> Ant<T> {
+    fn init(usb_device: UsbDevice<T>, rx: Receiver<Request>, tx: Sender<Response>) -> Ant<T> {
         Ant {
             usb_device,
             state: State::NotReady,
@@ -122,7 +122,7 @@ impl<T: UsbContext> Ant<T> {
     // check to see if any messages are waiting to be sent. Should a channel close due to error or
     // timeout, and the channel is still known, then the channel will be reopened until a request
     // is sent to close the channel by an upstream application.
-    pub fn run(&mut self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         // Check to see if we're already running
         if self.state == State::Running {
             return Err(AntError::AlreadyRunning);
