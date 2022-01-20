@@ -86,7 +86,7 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
                         debug!("Ant::init()::run() exited successfully. Exiting...");
                         break;
                     }
-                    Err(AntError::Reset) => {
+                    Err(e @ AntError::Reset) => {
                         // Tried resetting the ANT+ stick three times and failed.
                         if reset_attempts <= 2 {
                             debug!("Failed to reset ANT+ stick. Re-intializing USB device");
@@ -94,14 +94,14 @@ pub fn run(rx: Receiver<Request>, tx: Sender<Response>) {
                             continue;
                         }
                         error!("Error resetting the ANT+ stick");
-                        Response::Error(AntError::Reset)
+                        e
                     }
                     Err(e) => {
                         error!("Error initializing ANT+ stick: {:?}", e);
-                        Response::Error(e)
+                        e
                     }
                 };
-                tx.send(e).unwrap();
+                tx.send(Response::Error(e)).unwrap();
                 break;
             }
             Err(e @ AntError::UsbDeviceError(rusb::Error::NoDevice)) => {
