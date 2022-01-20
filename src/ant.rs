@@ -152,7 +152,7 @@ impl<T: UsbContext> Ant<T> {
                         // thread exiting. If the ANT+ stick gets stuck
                         // in this state,no messages will be received and acted
                         // on, and reset messages will just continue to be sent.
-                        // This is configured to try three times then exitt
+                        // This is configured to try three times then exit.
                         if reset_attempts < 2 {
                             debug! {"Sending reset command"};
                             self.reset()?;
@@ -197,7 +197,6 @@ impl<T: UsbContext> Ant<T> {
                             }
                         }
                         Request::Send(mesg) => {
-                            //let _ = self.usb_device.write(&mesg.encode());
                             self.usb_device.write(&mesg.encode()).unwrap();
                         }
                         Request::Quit => {
